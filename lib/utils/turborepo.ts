@@ -27,15 +27,18 @@ export async function checkIsTurborepo(
   token: string
 ): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/turbo.json`,
-      {
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'Authorization': `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      }
+      { headers }
     );
     return response.ok;
   } catch {
@@ -53,15 +56,18 @@ async function fetchPackageJson(
   token: string
 ): Promise<PackageInfo | null> {
   try {
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}/package.json`,
-      {
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'Authorization': `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      }
+      { headers }
     );
 
     if (!response.ok) {
@@ -99,15 +105,18 @@ async function fetchFolders(
   token: string
 ): Promise<string[]> {
   try {
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
-      {
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'Authorization': `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      }
+      { headers }
     );
 
     if (!response.ok) {
