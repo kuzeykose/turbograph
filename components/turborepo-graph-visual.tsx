@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { DependencyEdge, PackageInfo } from '@/lib/utils/turborepo';
 
 interface Node {
@@ -33,9 +33,49 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 1200, height: 800 });
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 0, height: 800 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const initialViewBoxRef = useRef({ width: 0, height: 800 });
+
+  // Initialize viewBox based on actual SVG dimensions
+  useLayoutEffect(() => {
+    const updateViewBox = () => {
+      if (svgRef.current) {
+        const rect = svgRef.current.getBoundingClientRect();
+        const width = rect.width || 1200;
+        const height = 800;
+        
+        // Only update initialViewBoxRef if it's the first time (width is 0)
+        if (initialViewBoxRef.current.width === 0) {
+          initialViewBoxRef.current = { width, height };
+        }
+        
+        setViewBox((prev) => {
+          // Maintain the same zoom level and pan position
+          const scaleX = width / (prev.width || width);
+          const scaleY = height / (prev.height || height);
+          
+          return {
+            x: prev.x * scaleX,
+            y: prev.y * scaleY,
+            width,
+            height,
+          };
+        });
+      }
+    };
+
+    // Initial update
+    updateViewBox();
+
+    // Add resize listener
+    window.addEventListener('resize', updateViewBox);
+
+    return () => {
+      window.removeEventListener('resize', updateViewBox);
+    };
+  }, []);
 
   // Initialize nodes and edges
   useEffect(() => {
@@ -134,18 +174,20 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
             }
           });
 
-          // Centering force (weak)
-          fx += (viewBox.width / 2 - node.x) * 0.001;
-          fy += (viewBox.height / 2 - node.y) * 0.001;
+          // Centering force (weak) - using fixed dimensions
+          const fixedWidth = 1200;
+          const fixedHeight = 800;
+          fx += (fixedWidth / 2 - node.x) * 0.001;
+          fy += (fixedHeight / 2 - node.y) * 0.001;
 
           // Apply damping
           const damping = 0.8;
           const newVx = (node.vx + fx) * damping;
           const newVy = (node.vy + fy) * damping;
 
-          // Update position
-          const newX = Math.max(50, Math.min(viewBox.width - 50, node.x + newVx));
-          const newY = Math.max(50, Math.min(viewBox.height - 50, node.y + newVy));
+          // Update position - using fixed dimensions
+          const newX = Math.max(50, Math.min(fixedWidth - 50, node.x + newVx));
+          const newY = Math.max(50, Math.min(fixedHeight - 50, node.y + newVy));
 
           return { ...node, x: newX, y: newY, vx: newVx, vy: newVy };
         });
@@ -153,13 +195,13 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
     };
 
     const interval = setInterval(animate, 50);
-    const timeout = setTimeout(() => clearInterval(interval), 5000); // Stop after 5 seconds
+    const timeout = setTimeout(() => clearInterval(interval), 3000); // Stop after 3 seconds
 
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [edges, viewBox.width, viewBox.height]);
+  }, [edges]);
 
   const handleMouseDown = (nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -175,7 +217,7 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
       const rect = svg.getBoundingClientRect();
       const scaleX = viewBox.width / rect.width;
       const scaleY = viewBox.height / rect.height;
-      
+
       const x = viewBox.x + (e.clientX - rect.left) * scaleX;
       const y = viewBox.y + (e.clientY - rect.top) * scaleY;
 
@@ -233,7 +275,7 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
   };
 
   const resetView = () => {
-    setViewBox({ x: 0, y: 0, width: 1200, height: 800 });
+    setViewBox({ x: 0, y: 0, ...initialViewBoxRef.current });
   };
 
   const getNodeColor = (type: 'app' | 'package') => {
