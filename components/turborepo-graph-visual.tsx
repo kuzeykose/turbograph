@@ -77,56 +77,122 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
     };
   }, []);
 
-  // Initialize nodes and edges
+  // Initialize nodes and edges with hierarchical layout
   useEffect(() => {
     const width = 1200;
     const height = 800;
     const padding = 100;
 
-    // Create nodes
-    const newNodes: Node[] = [];
-    
-    // Place apps on the left side
-    apps.forEach((app, i) => {
-      const y = padding + (i * (height - 2 * padding)) / Math.max(1, apps.length - 1);
-      newNodes.push({
-        id: app.name,
-        name: app.name,
-        type: 'app',
-        x: padding + 150,
-        y: apps.length === 1 ? height / 2 : y,
-        vx: 0,
-        vy: 0,
-      });
-    });
-
-    // Place packages on the right side
-    packages.forEach((pkg, i) => {
-      const y = padding + (i * (height - 2 * padding)) / Math.max(1, packages.length - 1);
-      newNodes.push({
-        id: pkg.name,
-        name: pkg.name,
-        type: 'package',
-        x: width - padding - 150,
-        y: packages.length === 1 ? height / 2 : y,
-        vx: 0,
-        vy: 0,
-      });
-    });
-
-    setNodes(newNodes);
-
-    // Create edges
+    // Create edges first (needed for depth calculation)
     const newEdges: Edge[] = dependencies.map((dep) => ({
       source: dep.from,
       target: dep.to,
       type: dep.type,
     }));
 
+    // Build adjacency list for dependency graph (reverse direction for depth calc)
+    // If A depends on B, then B should be at a lower depth (leftmost)
+    const dependsOn = new Map<string, Set<string>>();
+    const dependedBy = new Map<string, Set<string>>();
+
+    const allNodeIds = new Set<string>();
+    apps.forEach((app) => allNodeIds.add(app.name));
+    packages.forEach((pkg) => allNodeIds.add(pkg.name));
+
+    allNodeIds.forEach((id) => {
+      dependsOn.set(id, new Set());
+      dependedBy.set(id, new Set());
+    });
+
+    dependencies.forEach((dep) => {
+      // dep.from depends on dep.to
+      dependsOn.get(dep.from)?.add(dep.to);
+      dependedBy.get(dep.to)?.add(dep.from);
+    });
+
+    // Calculate depth using BFS from leaf nodes (nodes with no dependencies)
+    const nodeDepth = new Map<string, number>();
+    const queue: string[] = [];
+
+    // Find leaf nodes (packages/apps that don't depend on anything)
+    allNodeIds.forEach((id) => {
+      if (dependsOn.get(id)?.size === 0) {
+        nodeDepth.set(id, 0);
+        queue.push(id);
+      }
+    });
+
+    // BFS to calculate depths
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const currentDepth = nodeDepth.get(current)!;
+
+      dependedBy.get(current)?.forEach((parent) => {
+        const existingDepth = nodeDepth.get(parent);
+        const newDepth = currentDepth + 1;
+
+        if (existingDepth === undefined || newDepth > existingDepth) {
+          nodeDepth.set(parent, newDepth);
+        }
+
+        // Check if all dependencies of parent have been processed
+        const parentDeps = dependsOn.get(parent);
+        const allDepsProcessed = [...(parentDeps || [])].every((dep) => nodeDepth.has(dep));
+
+        if (allDepsProcessed && !queue.includes(parent)) {
+          queue.push(parent);
+        }
+      });
+    }
+
+    // Handle any remaining nodes (cycles or disconnected)
+    allNodeIds.forEach((id) => {
+      if (!nodeDepth.has(id)) {
+        nodeDepth.set(id, 0);
+      }
+    });
+
+    // Group nodes by depth
+    const nodesByDepth = new Map<number, string[]>();
+    nodeDepth.forEach((depth, nodeId) => {
+      if (!nodesByDepth.has(depth)) {
+        nodesByDepth.set(depth, []);
+      }
+      nodesByDepth.get(depth)!.push(nodeId);
+    });
+
+    const maxDepth = Math.max(...nodeDepth.values(), 0);
+    const levelWidth = (width - 2 * padding) / Math.max(1, maxDepth);
+
+    // Create nodes with hierarchical positions
+    const newNodes: Node[] = [];
+    const nodeTypeMap = new Map<string, 'app' | 'package'>();
+    apps.forEach((app) => nodeTypeMap.set(app.name, 'app'));
+    packages.forEach((pkg) => nodeTypeMap.set(pkg.name, 'package'));
+
+    nodesByDepth.forEach((nodesAtDepth, depth) => {
+      const x = padding + depth * levelWidth;
+      const verticalSpacing = (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
+
+      nodesAtDepth.forEach((nodeId, index) => {
+        const y = padding + verticalSpacing * (index + 0.5);
+        newNodes.push({
+          id: nodeId,
+          name: nodeId,
+          type: nodeTypeMap.get(nodeId) || 'package',
+          x,
+          y,
+          vx: 0,
+          vy: 0,
+        });
+      });
+    });
+
+    setNodes(newNodes);
     setEdges(newEdges);
   }, [apps, packages, dependencies]);
 
-  // Apply force simulation
+  // Apply force simulation (primarily vertical to maintain hierarchical layers)
   useEffect(() => {
     if (nodes.length === 0) return;
 
@@ -140,53 +206,38 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
           let fx = 0;
           let fy = 0;
 
-          // Spring force to keep connected nodes at a reasonable distance
-          edges.forEach((edge) => {
-            const isSource = edge.source === node.id;
-            const isTarget = edge.target === node.id;
-            
-            if (isSource || isTarget) {
-              const otherId = isSource ? edge.target : edge.source;
-              const other = prevNodes.find((n) => n.id === otherId);
-              if (other) {
-                const dx = other.x - node.x;
-                const dy = other.y - node.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const idealDistance = 300;
-                const force = (distance - idealDistance) * 0.01;
-                fx += (dx / distance) * force;
-                fy += (dy / distance) * force;
-              }
-            }
-          });
-
-          // Repulsion force between nodes
+          // Vertical repulsion between nodes (stronger for nodes at same x-level)
           prevNodes.forEach((other) => {
             if (other.id !== node.id) {
               const dx = node.x - other.x;
               const dy = node.y - other.y;
               const distance = Math.sqrt(dx * dx + dy * dy);
-              if (distance < 200 && distance > 0) {
-                const force = 200 / (distance * distance);
-                fx += (dx / distance) * force;
+
+              // Strong vertical repulsion for nodes at similar x positions (same layer)
+              const sameLayer = Math.abs(dx) < 100;
+              const repulsionDistance = sameLayer ? 150 : 100;
+
+              if (distance < repulsionDistance && distance > 0) {
+                const force = (sameLayer ? 400 : 100) / (distance * distance);
+                // Primarily apply vertical force to maintain layers
+                fx += (dx / distance) * force * 0.1;
                 fy += (dy / distance) * force;
               }
             }
           });
 
-          // Centering force (weak) - using fixed dimensions
-          const fixedWidth = 1200;
+          // Weak vertical centering to keep nodes within view
           const fixedHeight = 800;
-          fx += (fixedWidth / 2 - node.x) * 0.001;
-          fy += (fixedHeight / 2 - node.y) * 0.001;
+          fy += (fixedHeight / 2 - node.y) * 0.002;
 
           // Apply damping
-          const damping = 0.8;
+          const damping = 0.7;
           const newVx = (node.vx + fx) * damping;
           const newVy = (node.vy + fy) * damping;
 
-          // Update position - using fixed dimensions
-          const newX = Math.max(50, Math.min(fixedWidth - 50, node.x + newVx));
+          // Update position - keep x mostly stable, allow y to adjust
+          const fixedWidth = 1200;
+          const newX = Math.max(50, Math.min(fixedWidth - 50, node.x + newVx * 0.3));
           const newY = Math.max(50, Math.min(fixedHeight - 50, node.y + newVy));
 
           return { ...node, x: newX, y: newY, vx: newVx, vy: newVy };
@@ -195,7 +246,7 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
     };
 
     const interval = setInterval(animate, 50);
-    const timeout = setTimeout(() => clearInterval(interval), 3000); // Stop after 3 seconds
+    const timeout = setTimeout(() => clearInterval(interval), 2000);
 
     return () => {
       clearInterval(interval);
