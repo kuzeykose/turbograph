@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { DependencyEdge, PackageInfo } from '@/lib/utils/turborepo';
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { DependencyEdge, PackageInfo } from "@/lib/utils/turborepo";
 
 interface Node {
   id: string;
   name: string;
-  type: 'app' | 'package';
+  type: "app" | "package";
   x: number;
   y: number;
   vx: number;
@@ -18,7 +18,7 @@ interface Node {
 interface Edge {
   source: string;
   target: string;
-  type: 'dependency' | 'devDependency';
+  type: "dependency" | "devDependency";
 }
 
 interface TurborepoGraphVisualProps {
@@ -27,7 +27,11 @@ interface TurborepoGraphVisualProps {
   dependencies: DependencyEdge[];
 }
 
-export function TurborepoGraphVisual({ apps, packages, dependencies }: TurborepoGraphVisualProps) {
+export function TurborepoGraphVisual({
+  apps,
+  packages,
+  dependencies,
+}: TurborepoGraphVisualProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -45,17 +49,17 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
         const rect = svgRef.current.getBoundingClientRect();
         const width = rect.width || 1200;
         const height = 800;
-        
+
         // Only update initialViewBoxRef if it's the first time (width is 0)
         if (initialViewBoxRef.current.width === 0) {
           initialViewBoxRef.current = { width, height };
         }
-        
+
         setViewBox((prev) => {
           // Maintain the same zoom level and pan position
           const scaleX = width / (prev.width || width);
           const scaleY = height / (prev.height || height);
-          
+
           return {
             x: prev.x * scaleX,
             y: prev.y * scaleY,
@@ -70,10 +74,10 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
     updateViewBox();
 
     // Add resize listener
-    window.addEventListener('resize', updateViewBox);
+    window.addEventListener("resize", updateViewBox);
 
     return () => {
-      window.removeEventListener('resize', updateViewBox);
+      window.removeEventListener("resize", updateViewBox);
     };
   }, []);
 
@@ -137,7 +141,9 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
 
         // Check if all dependencies of parent have been processed
         const parentDeps = dependsOn.get(parent);
-        const allDepsProcessed = [...(parentDeps || [])].every((dep) => nodeDepth.has(dep));
+        const allDepsProcessed = [...(parentDeps || [])].every((dep) =>
+          nodeDepth.has(dep),
+        );
 
         if (allDepsProcessed && !queue.includes(parent)) {
           queue.push(parent);
@@ -166,20 +172,21 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
 
     // Create nodes with hierarchical positions
     const newNodes: Node[] = [];
-    const nodeTypeMap = new Map<string, 'app' | 'package'>();
-    apps.forEach((app) => nodeTypeMap.set(app.name, 'app'));
-    packages.forEach((pkg) => nodeTypeMap.set(pkg.name, 'package'));
+    const nodeTypeMap = new Map<string, "app" | "package">();
+    apps.forEach((app) => nodeTypeMap.set(app.name, "app"));
+    packages.forEach((pkg) => nodeTypeMap.set(pkg.name, "package"));
 
     nodesByDepth.forEach((nodesAtDepth, depth) => {
       const x = padding + depth * levelWidth;
-      const verticalSpacing = (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
+      const verticalSpacing =
+        (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
 
       nodesAtDepth.forEach((nodeId, index) => {
         const y = padding + verticalSpacing * (index + 0.5);
         newNodes.push({
           id: nodeId,
           name: nodeId,
-          type: nodeTypeMap.get(nodeId) || 'package',
+          type: nodeTypeMap.get(nodeId) || "package",
           x,
           y,
           vx: 0,
@@ -237,7 +244,10 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
 
           // Update position - keep x mostly stable, allow y to adjust
           const fixedWidth = 1200;
-          const newX = Math.max(50, Math.min(fixedWidth - 50, node.x + newVx * 0.3));
+          const newX = Math.max(
+            50,
+            Math.min(fixedWidth - 50, node.x + newVx * 0.3),
+          );
           const newY = Math.max(50, Math.min(fixedHeight - 50, node.y + newVy));
 
           return { ...node, x: newX, y: newY, vx: newVx, vy: newVy };
@@ -276,19 +286,19 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
         prevNodes.map((node) =>
           node.id === draggedNode
             ? { ...node, x, y, fx: x, fy: y, vx: 0, vy: 0 }
-            : node
-        )
+            : node,
+        ),
       );
     } else if (isPanning) {
       const dx = (e.clientX - panStart.x) * -1;
       const dy = (e.clientY - panStart.y) * -1;
-      
+
       setViewBox((prev) => ({
         ...prev,
         x: prev.x + dx,
         y: prev.y + dy,
       }));
-      
+
       setPanStart({ x: e.clientX, y: e.clientY });
     }
   };
@@ -299,8 +309,8 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
         prevNodes.map((node) =>
           node.id === draggedNode
             ? { ...node, fx: undefined, fy: undefined }
-            : node
-        )
+            : node,
+        ),
       );
     }
     setDraggedNode(null);
@@ -317,7 +327,7 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
     const scaleFactor = e.deltaY > 0 ? 1.1 : 0.9;
-    
+
     setViewBox((prev) => ({
       ...prev,
       width: prev.width * scaleFactor,
@@ -329,12 +339,12 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
     setViewBox({ x: 0, y: 0, ...initialViewBoxRef.current });
   };
 
-  const getNodeColor = (type: 'app' | 'package') => {
-    return type === 'app' ? '#3b82f6' : '#a855f7';
+  const getNodeColor = (type: "app" | "package") => {
+    return type === "app" ? "#3b82f6" : "#a855f7";
   };
 
-  const getEdgeColor = (type: 'dependency' | 'devDependency') => {
-    return type === 'dependency' ? '#10b981' : '#f59e0b';
+  const getEdgeColor = (type: "dependency" | "devDependency") => {
+    return type === "dependency" ? "#10b981" : "#f59e0b";
   };
 
   // Get connected nodes for highlighting
@@ -347,7 +357,9 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
     return connected;
   };
 
-  const connectedNodes = selectedNode ? getConnectedNodes(selectedNode) : new Set<string>();
+  const connectedNodes = selectedNode
+    ? getConnectedNodes(selectedNode)
+    : new Set<string>();
 
   return (
     <div className="relative">
@@ -418,7 +430,7 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
           {edges.map((edge, i) => {
             const sourceNode = nodes.find((n) => n.id === edge.source);
             const targetNode = nodes.find((n) => n.id === edge.target);
-            
+
             if (!sourceNode || !targetNode) return null;
 
             const isHighlighted =
@@ -446,7 +458,7 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
           {nodes.map((node) => {
             const isHighlighted = connectedNodes.has(node.id);
             const isSelected = selectedNode === node.id;
-            
+
             return (
               <g
                 key={node.id}
@@ -459,11 +471,11 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
                 <circle
                   r={isSelected ? 50 : 40}
                   fill={getNodeColor(node.type)}
-                  stroke={isSelected ? '#fbbf24' : 'white'}
+                  stroke={isSelected ? "#fbbf24" : "white"}
                   strokeWidth={isSelected ? 4 : 2}
                   className="transition-all duration-200"
                 />
-                
+
                 {/* Node label */}
                 <text
                   textAnchor="middle"
@@ -474,10 +486,10 @@ export function TurborepoGraphVisual({ apps, packages, dependencies }: Turborepo
                   className="pointer-events-none select-none"
                 >
                   {node.name.length > 15
-                    ? node.name.substring(0, 12) + '...'
+                    ? node.name.substring(0, 12) + "..."
                     : node.name}
                 </text>
-                
+
                 {/* Type badge */}
                 <text
                   textAnchor="middle"
