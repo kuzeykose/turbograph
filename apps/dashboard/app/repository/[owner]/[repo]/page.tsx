@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { Repository, ContentItem, FileContent } from "@/types/repository";
 import { RepositoryHeader } from "@/components/repository-header";
+import { CommitList, Commit, CommitFile } from '@/components/commit-list';
 
 export default function RepositoryPage() {
   const params = useParams();
@@ -32,8 +33,21 @@ export default function RepositoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [pathHistory, setPathHistory] = useState<string[]>([""]);
 
+  // Commits state
+  const [commits, setCommits] = useState<Commit[]>([]);
+  const [commitsLoading, setCommitsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasMoreCommits, setHasMoreCommits] = useState(true);
+  const commitsPerPage = 30;
+
+  // Impact visualization state
+  const [affectedPackages, setAffectedPackages] = useState<string[]>([]);
+  const [downstreamDependents, setDownstreamDependents] = useState<string[]>([]);
+
+
   // Turborepo state
-  const [activeTab, setActiveTab] = useState<"files" | "turborepo">("files");
+  const [activeTab, setActiveTab] = useState<"files" | "turborepo" | "commits">("files");
   const [turborepoStructure, setTurborepoStructure] =
     useState<TurborepoStructure | null>(null);
   const [turborepoLoading, setTurborepoLoading] = useState(false);
@@ -157,6 +171,125 @@ export default function RepositoryPage() {
 
     fetchContents();
   }, [owner, repo, currentPath]);
+
+  // Fetch commits
+  useEffect(() => {
+    async function fetchCommits() {
+      if (!owner || !repo || activeTab !== 'commits') return;
+
+      try {
+        setCommitsLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.provider_token;
+
+        const headers: Record<string, string> = {
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        };
+
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits`);
+        url.searchParams.append('page', currentPage.toString());
+        url.searchParams.append('per_page', commitsPerPage.toString());
+
+        const response = await fetch(url.toString(), {
+          headers,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch commits: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setCommits(data);
+
+        // Check if there are more commits (if we got less than per_page, we're on the last page)
+        setHasMoreCommits(data.length === commitsPerPage);
+
+        // Parse Link header for pagination info if available
+        const linkHeader = response.headers.get('Link');
+        if (linkHeader) {
+          const lastPageMatch = linkHeader.match(/page=(\d+)>; rel="last"/);
+          if (lastPageMatch) {
+            setTotalPages(parseInt(lastPageMatch[1]));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching commits:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch commits');
+      } finally {
+        setCommitsLoading(false);
+      }
+    }
+
+    fetchCommits();
+  }, [owner, repo, activeTab, currentPage]);
+
+  // Fetch commit details (files changed)
+  const fetchCommitDetails = async (sha: string): Promise<CommitFile[]> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.provider_token;
+
+    const headers: Record<string, string> = {
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/commits/${sha}`,
+      { headers }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch commit details: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.files || [];
+  };
+
+  // Handle impact change from CommitList
+  const handleImpactChange = (affected: string[], downstream: string[]) => {
+    setAffectedPackages(affected);
+    setDownstreamDependents(downstream);
+  };
+
+  // Filter graph to show only affected packages tree
+  const getFilteredGraphData = () => {
+    if (!turborepoStructure || affectedPackages.length === 0) {
+      // Show full graph when no commit is expanded
+      return {
+        apps: turborepoStructure?.apps || [],
+        packages: turborepoStructure?.packages || [],
+        dependencies: dependencyGraph,
+      };
+    }
+
+    // Combined set of all packages to show
+    const packagesToShow = new Set([...affectedPackages, ...downstreamDependents]);
+
+    // Filter apps and packages
+    const filteredApps = turborepoStructure.apps.filter(app => packagesToShow.has(app.name));
+    const filteredPackages = turborepoStructure.packages.filter(pkg => packagesToShow.has(pkg.name));
+
+    // Filter dependencies to only show edges between visible nodes
+    const filteredDependencies = dependencyGraph.filter(dep =>
+      packagesToShow.has(dep.from) && packagesToShow.has(dep.to)
+    );
+
+    return {
+      apps: filteredApps,
+      packages: filteredPackages,
+      dependencies: filteredDependencies,
+    };
+  };
 
   const handleFileClick = async (file: ContentItem) => {
     if (file.type === "dir") {
@@ -306,11 +439,10 @@ export default function RepositoryPage() {
             <div className="flex gap-4">
               <button
                 onClick={() => setActiveTab("files")}
-                className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "files"
-                    ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
-                    : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                }`}
+                className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "files"
+                  ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                  : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   <svg
@@ -330,12 +462,25 @@ export default function RepositoryPage() {
                 </div>
               </button>
               <button
+                onClick={() => setActiveTab('commits')}
+                className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === 'commits'
+                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                  : 'border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
+                  }`}
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Commits
+                </div>
+              </button>
+              <button
                 onClick={() => setActiveTab("turborepo")}
-                className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "turborepo"
-                    ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
-                    : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-                }`}
+                className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "turborepo"
+                  ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400"
+                  : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   <svg
@@ -422,7 +567,7 @@ export default function RepositoryPage() {
                 </div>
 
                 {turborepoStructure.apps.length === 0 &&
-                turborepoStructure.packages.length === 0 ? (
+                  turborepoStructure.packages.length === 0 ? (
                   <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800 dark:bg-zinc-800">
                     <svg
                       className="mx-auto h-12 w-12 text-zinc-400"
@@ -573,6 +718,94 @@ export default function RepositoryPage() {
                       </svg>
                       <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
                         Select a file to view its contents
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Commits View */}
+        {activeTab === 'commits' && (
+          <div className="grid gap-6 lg:grid-cols-12">
+            {/* Commit List - Left Column */}
+            <div className="lg:col-span-5">
+              <CommitList
+                commits={commits}
+                loading={commitsLoading}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                hasMore={hasMoreCommits}
+                onPageChange={setCurrentPage}
+                turborepoStructure={turborepoStructure || undefined}
+                dependencyGraph={dependencyGraph}
+                onFetchCommitDetails={fetchCommitDetails}
+                onImpactChange={handleImpactChange}
+              />
+            </div>
+
+            {/* Dependency Graph - Right Column */}
+            <div className="lg:col-span-7">
+              <div className="sticky top-6">
+                {turborepoStructure?.isTurborepo ? (() => {
+                  const filteredData = getFilteredGraphData();
+                  return (
+                    <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                      <h3 className="mb-2 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                        {affectedPackages.length > 0 ? 'Commit Impact Tree' : 'Dependency Graph'}
+                      </h3>
+                      {affectedPackages.length > 0 ? (
+                        <div className="mb-4 space-y-2">
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                            Showing {affectedPackages.length} affected package{affectedPackages.length !== 1 ? 's' : ''} and {downstreamDependents.length} downstream dependent{downstreamDependents.length !== 1 ? 's' : ''}
+                          </p>
+                          <div className="flex gap-4 text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <div className="h-3 w-3 rounded-full bg-purple-500" />
+                              <span className="text-zinc-600 dark:text-zinc-400">Affected Packages</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="h-3 w-3 rounded-full bg-orange-500" />
+                              <span className="text-zinc-600 dark:text-zinc-400">Downstream Dependents</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+                          Expand a commit to see its impact tree
+                        </p>
+                      )}
+                      <TurborepoGraph
+                        apps={filteredData.apps}
+                        packages={filteredData.packages}
+                        dependencies={filteredData.dependencies}
+                      />
+                    </div>
+                  );
+                })() : (
+                  <div className="rounded-lg border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-900">
+                    <div className="text-center">
+                      <svg
+                        className="mx-auto h-12 w-12 text-zinc-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                        />
+                      </svg>
+                      <h3 className="mt-4 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+                        Not a Turborepo
+                      </h3>
+                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        Dependency graph visualization is only available for Turborepo monorepos
                       </p>
                     </div>
                   </div>
