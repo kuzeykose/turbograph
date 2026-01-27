@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
-import { supabase } from '@/lib/supabase/client';
-import { getLanguageColor } from '@/lib/utils/language-colors';
-import Link from 'next/link';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
+import { supabase } from "@/lib/supabase/client";
+import { getLanguageColor } from "@/lib/utils/language-colors";
+import Link from "next/link";
 
 interface Repository {
   id: number;
@@ -20,6 +20,7 @@ interface Repository {
   language: string | null;
   updated_at: string;
   default_branch: string;
+  isTurborepo: boolean;
   owner: {
     login: string;
     avatar_url: string;
@@ -32,13 +33,14 @@ export default function RepositoriesPage() {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [repoUrl, setRepoUrl] = useState('');
+  const [repoUrl, setRepoUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [showAllRepos, setShowAllRepos] = useState(false);
 
   useEffect(() => {
     // Redirect to login if not authenticated
     if (!authLoading && !user) {
-      router.push('/login');
+      router.push("/login");
     }
   }, [user, authLoading, router]);
 
@@ -51,30 +53,94 @@ export default function RepositoriesPage() {
         setError(null);
 
         // Get the GitHub access token from Supabase session
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         if (!session?.provider_token) {
-          throw new Error('No GitHub access token found');
+          throw new Error("No GitHub access token found");
         }
 
         // Fetch repositories from GitHub API
-        const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', {
-          headers: {
-            'Accept': 'application/vnd.github+json',
-            'Authorization': `Bearer ${session.provider_token}`,
-            'X-GitHub-Api-Version': '2022-11-28',
+        const reposResponse = await fetch(
+          "https://api.github.com/user/repos?sort=updated&per_page=100",
+          {
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: `Bearer ${session.provider_token}`,
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
           },
-        });
+        );
 
-        if (!response.ok) {
-          throw new Error(`GitHub API error: ${response.statusText}`);
+        if (!reposResponse.ok) {
+          throw new Error(`GitHub API error: ${reposResponse.statusText}`);
         }
 
-        const data = await response.json();
-        setRepositories(data);
+        const repos = await reposResponse.json();
+
+        // Use GitHub GraphQL API to batch check for turbo.json
+        // This checks ~50 repos per request instead of 1 request per repo
+        const turborepoRepoNames = new Set<string>();
+        const BATCH_SIZE = 50;
+
+        for (let i = 0; i < repos.length; i += BATCH_SIZE) {
+          const batch = repos.slice(i, i + BATCH_SIZE);
+
+          // Build GraphQL query to check turbo.json existence for each repo
+          const repoQueries = batch
+            .map((repo: Repository, index: number) => {
+              const [owner, name] = repo.full_name.split("/");
+              return `repo${index}: repository(owner: "${owner}", name: "${name}") {
+              object(expression: "HEAD:turbo.json") {
+                ... on Blob { id }
+              }
+            }`;
+            })
+            .join("\n");
+
+          const query = `query { ${repoQueries} }`;
+
+          try {
+            const graphqlResponse = await fetch(
+              "https://api.github.com/graphql",
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${session.provider_token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ query }),
+              },
+            );
+
+            if (graphqlResponse.ok) {
+              const graphqlData = await graphqlResponse.json();
+
+              batch.forEach((repo: Repository, index: number) => {
+                const repoData = graphqlData.data?.[`repo${index}`];
+                if (repoData?.object) {
+                  turborepoRepoNames.add(repo.full_name);
+                }
+              });
+            }
+          } catch (graphqlErr) {
+            console.warn("GraphQL batch check failed:", graphqlErr);
+          }
+        }
+
+        // Mark repositories with Turborepo detection
+        const reposWithTurboCheck = repos.map((repo: Repository) => ({
+          ...repo,
+          isTurborepo: turborepoRepoNames.has(repo.full_name),
+        }));
+
+        setRepositories(reposWithTurboCheck);
       } catch (err) {
-        console.error('Error fetching repositories:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch repositories');
+        console.error("Error fetching repositories:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch repositories",
+        );
       } finally {
         setLoading(false);
       }
@@ -85,11 +151,16 @@ export default function RepositoriesPage() {
     }
   }, [user, authLoading]);
 
-  const parseGitHubUrl = (url: string): { owner: string; repo: string } | null => {
+  const parseGitHubUrl = (
+    url: string,
+  ): { owner: string; repo: string } | null => {
     try {
       // Remove trailing slash and .git extension
-      const cleanUrl = url.trim().replace(/\.git$/, '').replace(/\/$/, '');
-      
+      const cleanUrl = url
+        .trim()
+        .replace(/\.git$/, "")
+        .replace(/\/$/, "");
+
       // Handle different GitHub URL formats
       // https://github.com/owner/repo
       // github.com/owner/repo
@@ -97,7 +168,7 @@ export default function RepositoriesPage() {
       const patterns = [
         /^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)/,
         /^github\.com\/([^\/]+)\/([^\/]+)/,
-        /^([^\/]+)\/([^\/]+)$/
+        /^([^\/]+)\/([^\/]+)$/,
       ];
 
       for (const pattern of patterns) {
@@ -105,11 +176,11 @@ export default function RepositoriesPage() {
         if (match) {
           return {
             owner: match[1],
-            repo: match[2].replace(/\.git$/, '')
+            repo: match[2].replace(/\.git$/, ""),
           };
         }
       }
-      
+
       return null;
     } catch {
       return null;
@@ -121,20 +192,29 @@ export default function RepositoriesPage() {
     setUrlError(null);
 
     if (!repoUrl.trim()) {
-      setUrlError('Please enter a repository URL');
+      setUrlError("Please enter a repository URL");
       return;
     }
 
     const parsed = parseGitHubUrl(repoUrl);
-    
+
     if (!parsed) {
-      setUrlError('Invalid GitHub repository URL. Examples: https://github.com/owner/repo or owner/repo');
+      setUrlError(
+        "Invalid GitHub repository URL. Examples: https://github.com/owner/repo or owner/repo",
+      );
       return;
     }
 
     // Navigate to the repository page
     router.push(`/repository/${parsed.owner}/${parsed.repo}`);
   };
+
+  // Filter repositories based on toggle
+  const filteredRepositories = showAllRepos
+    ? repositories
+    : repositories.filter((repo) => repo.isTurborepo);
+
+  const turborepoCount = repositories.filter((repo) => repo.isTurborepo).length;
 
   // Show loading state while checking authentication
   if (authLoading) {
@@ -157,21 +237,67 @@ export default function RepositoriesPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <div className="mx-auto max-w-7xl px-4 py-12">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-              Your Repositories
-            </h1>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Repositories from your GitHub account or browse any public repository
-            </p>
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+                Your Repositories
+              </h1>
+              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                Repositories from your GitHub account or browse any public
+                repository
+              </p>
+            </div>
+            <Link
+              href="/dashboard"
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
+            >
+              Back to Dashboard
+            </Link>
           </div>
-          <Link
-            href="/dashboard"
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-          >
-            Back to Dashboard
-          </Link>
+          {/* Filter Toggle */}
+          {!loading && !error && repositories.length > 0 && (
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={() => setShowAllRepos(!showAllRepos)}
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  showAllRepos
+                    ? "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    : "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                }`}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                  />
+                </svg>
+                {showAllRepos ? "Show Turborepo Only" : "Show All Repositories"}
+              </button>
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                {showAllRepos ? (
+                  <>
+                    Showing all {repositories.length} repositories (
+                    {turborepoCount} Turborepo{" "}
+                    {turborepoCount === 1 ? "project" : "projects"})
+                  </>
+                ) : (
+                  <>
+                    Showing {turborepoCount} Turborepo{" "}
+                    {turborepoCount === 1 ? "project" : "projects"} (of{" "}
+                    {repositories.length} total)
+                  </>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Public Repository URL Input */}
@@ -181,10 +307,14 @@ export default function RepositoriesPage() {
               Browse Public Repository
             </h2>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Enter any public GitHub repository URL to explore its structure and dependencies
+              Enter any public GitHub repository URL to explore its structure
+              and dependencies
             </p>
           </div>
-          <form onSubmit={handlePublicRepoSubmit} className="flex flex-col gap-3 sm:flex-row">
+          <form
+            onSubmit={handlePublicRepoSubmit}
+            className="flex flex-col gap-3 sm:flex-row"
+          >
             <div className="flex-1">
               <input
                 type="text"
@@ -206,8 +336,18 @@ export default function RepositoriesPage() {
               type="submit"
               className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
               Explore
             </button>
@@ -235,13 +375,10 @@ export default function RepositoriesPage() {
         )}
 
         {/* Repositories List */}
-        {!loading && !error && repositories.length > 0 && (
+        {!loading && !error && filteredRepositories.length > 0 && (
           <div className="space-y-4">
-            <div className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-              Found {repositories.length} {repositories.length === 1 ? 'repository' : 'repositories'}
-            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {repositories.map((repo) => (
+              {filteredRepositories.map((repo) => (
                 <div
                   key={repo.id}
                   className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
@@ -262,13 +399,22 @@ export default function RepositoriesPage() {
                         className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                         title="View on GitHub"
                       >
-                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <svg
+                          className="h-5 w-5"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
                           <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
                           <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
                         </svg>
                       </a>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
+                      {repo.isTurborepo && (
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                          Turborepo
+                        </span>
+                      )}
                       {repo.private && (
                         <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                           Private
@@ -293,9 +439,11 @@ export default function RepositoriesPage() {
                   <div className="flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
                     {repo.language && (
                       <div className="flex items-center gap-1">
-                        <span 
-                          className="h-3 w-3 rounded-full" 
-                          style={{ backgroundColor: getLanguageColor(repo.language) }}
+                        <span
+                          className="h-3 w-3 rounded-full"
+                          style={{
+                            backgroundColor: getLanguageColor(repo.language),
+                          }}
                         />
                         <span>{repo.language}</span>
                       </div>
@@ -346,7 +494,7 @@ export default function RepositoriesPage() {
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty State - No repositories at all */}
         {!loading && !error && repositories.length === 0 && (
           <div className="rounded-lg border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
             <svg
@@ -366,7 +514,7 @@ export default function RepositoriesPage() {
               No repositories found
             </h3>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              You don't have any repositories yet.
+              You don&apos;t have any repositories yet.
             </p>
             <a
               href="https://github.com/new"
@@ -391,6 +539,42 @@ export default function RepositoriesPage() {
             </a>
           </div>
         )}
+
+        {/* Empty State - No Turborepo projects when filtered */}
+        {!loading &&
+          !error &&
+          repositories.length > 0 &&
+          filteredRepositories.length === 0 &&
+          !showAllRepos && (
+            <div className="rounded-lg border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
+              <svg
+                className="mx-auto h-12 w-12 text-zinc-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              <h3 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                No Turborepo projects found
+              </h3>
+              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                None of your {repositories.length} repositories contain a
+                turbo.json file.
+              </p>
+              <button
+                onClick={() => setShowAllRepos(true)}
+                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                Show all repositories
+              </button>
+            </div>
+          )}
       </div>
     </div>
   );
