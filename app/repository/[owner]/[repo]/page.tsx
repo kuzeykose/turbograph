@@ -294,13 +294,12 @@ export default function RepositoryPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
+      {/* Header */}
+      <RepositoryHeader
+        repository={repository}
+        turborepoStructure={turborepoStructure}
+      />
       <div className="mx-auto max-w-full px-4 py-6">
-        {/* Header */}
-        <RepositoryHeader
-          repository={repository}
-          turborepoStructure={turborepoStructure}
-        />
-
         {/* Tabs */}
         {turborepoStructure?.isTurborepo && (
           <div className="mb-6 border-b border-zinc-200 dark:border-zinc-800">
