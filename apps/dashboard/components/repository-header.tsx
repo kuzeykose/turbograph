@@ -38,16 +38,14 @@ export function RepositoryHeader({
           <ArrowLeft className="w-4 h-4" />
         </Link>
 
+
         {repository && (
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-
-                <BreadcrumbItem>
-                  <BreadcrumbPage>
-                    {repository.owner.login}
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
+                <BreadcrumbPage>
+                  {repository.owner.login}
+                </BreadcrumbPage>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
