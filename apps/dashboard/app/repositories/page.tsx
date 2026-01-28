@@ -3,28 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { supabase } from "@/lib/supabase/client";
+import { githubService } from "@/lib/services/github";
 import { getLanguageColor } from "@/lib/utils/language-colors";
 import Link from "next/link";
+import { GitHubRepository } from "@/types/github";
 
-interface Repository {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string | null;
-  html_url: string;
-  private: boolean;
-  fork: boolean;
-  stargazers_count: number;
-  forks_count: number;
-  language: string | null;
-  updated_at: string;
-  default_branch: string;
+interface Repository extends GitHubRepository {
   isTurborepo: boolean;
-  owner: {
-    login: string;
-    avatar_url: string;
-  };
 }
 
 export default function RepositoriesPage() {
@@ -52,87 +37,27 @@ export default function RepositoriesPage() {
         setLoading(true);
         setError(null);
 
-        // Get the GitHub access token from Supabase session
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session?.provider_token) {
-          throw new Error("No GitHub access token found");
-        }
-
         // Fetch repositories from GitHub API
-        const reposResponse = await fetch(
-          "https://api.github.com/user/repos?sort=updated&per_page=100",
-          {
-            headers: {
-              Accept: "application/vnd.github+json",
-              Authorization: `Bearer ${session.provider_token}`,
-              "X-GitHub-Api-Version": "2022-11-28",
-            },
-          },
-        );
-
-        if (!reposResponse.ok) {
-          throw new Error(`GitHub API error: ${reposResponse.statusText}`);
-        }
-
-        const repos = await reposResponse.json();
+        const repos = await githubService.getUserRepositories({
+          sort: "updated",
+          perPage: 100,
+        });
 
         // Use GitHub GraphQL API to batch check for turbo.json
         // This checks ~50 repos per request instead of 1 request per repo
-        const turborepoRepoNames = new Set<string>();
-        const BATCH_SIZE = 50;
+        const repositoriesToCheck = repos.map((repo) => {
+          const [owner, name] = repo.full_name.split("/");
+          return { owner, name };
+        });
 
-        for (let i = 0; i < repos.length; i += BATCH_SIZE) {
-          const batch = repos.slice(i, i + BATCH_SIZE);
-
-          // Build GraphQL query to check turbo.json existence for each repo
-          const repoQueries = batch
-            .map((repo: Repository, index: number) => {
-              const [owner, name] = repo.full_name.split("/");
-              return `repo${index}: repository(owner: "${owner}", name: "${name}") {
-              object(expression: "HEAD:turbo.json") {
-                ... on Blob { id }
-              }
-            }`;
-            })
-            .join("\n");
-
-          const query = `query { ${repoQueries} }`;
-
-          try {
-            const graphqlResponse = await fetch(
-              "https://api.github.com/graphql",
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${session.provider_token}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ query }),
-              },
-            );
-
-            if (graphqlResponse.ok) {
-              const graphqlData = await graphqlResponse.json();
-
-              batch.forEach((repo: Repository, index: number) => {
-                const repoData = graphqlData.data?.[`repo${index}`];
-                if (repoData?.object) {
-                  turborepoRepoNames.add(repo.full_name);
-                }
-              });
-            }
-          } catch (graphqlErr) {
-            console.warn("GraphQL batch check failed:", graphqlErr);
-          }
-        }
+        const turborepoResults = await githubService.batchCheckTurboJson(
+          repositoriesToCheck
+        );
 
         // Mark repositories with Turborepo detection
-        const reposWithTurboCheck = repos.map((repo: Repository) => ({
+        const reposWithTurboCheck: Repository[] = repos.map((repo) => ({
           ...repo,
-          isTurborepo: turborepoRepoNames.has(repo.full_name),
+          isTurborepo: turborepoResults.get(repo.full_name) || false,
         }));
 
         setRepositories(reposWithTurboCheck);
@@ -260,11 +185,10 @@ export default function RepositoriesPage() {
             <div className="mt-4 flex items-center gap-3">
               <button
                 onClick={() => setShowAllRepos(!showAllRepos)}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  showAllRepos
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${showAllRepos
                     ? "border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                     : "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                }`}
+                  }`}
               >
                 <svg
                   className="h-4 w-4"

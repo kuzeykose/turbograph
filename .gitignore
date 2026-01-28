@@ -11,6 +11,7 @@ node_modules
 !.yarn/versions
 **/.pnpm-store/
 .pnpm-store
+*.tsbuildinfo
 
 # Local env files
 .env

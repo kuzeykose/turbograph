@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { supabase } from "@/lib/supabase/client";
+import { githubService } from "@/lib/services/github";
 import {
   analyzeTurborepo,
   buildDependencyGraph,
@@ -63,38 +63,13 @@ export default function RepositoryPage() {
       if (!owner || !repo) return;
 
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const token = session?.provider_token;
-
-        const headers: Record<string, string> = {
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        };
-
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(
-          `https://api.github.com/repos/${owner}/${repo}`,
-          {
-            headers,
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch repository: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await githubService.getRepository(owner, repo);
         setRepository(data);
 
         // Check if this is a Turborepo
         setTurborepoLoading(true);
         try {
-          const structure = await analyzeTurborepo(owner, repo, token || "");
+          const structure = await analyzeTurborepo(owner, repo, "");
           setTurborepoStructure(structure);
 
           if (structure.isTurborepo) {
@@ -127,41 +102,26 @@ export default function RepositoryPage() {
         setError(null);
         setSelectedFile(null);
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const token = session?.provider_token;
-
-        const headers: Record<string, string> = {
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        };
-
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        let url = currentPath
-          ? `https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}`
-          : `https://api.github.com/repos/${owner}/${repo}/contents`;
-
-        if (branch) {
-          url += `?ref=${branch}`;
-        }
-
-        const response = await fetch(url, {
-          headers,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch contents: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await githubService.getContents(
+          owner,
+          repo,
+          currentPath,
+          { ref: branch }
+        );
 
         // If it's a file, show it directly
         if (!Array.isArray(data)) {
-          handleFileClick(data);
+          // Convert FileContent to ContentItem format for handleFileClick
+          const fileItem = {
+            name: data.name,
+            path: data.path,
+            type: "file" as const,
+            size: data.size,
+            sha: data.sha,
+            url: "", // Not needed for file click
+            html_url: "", // Not needed for file click
+          };
+          handleFileClick(fileItem);
           return;
         }
 
@@ -186,44 +146,18 @@ export default function RepositoryPage() {
 
       try {
         setCommitsLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.provider_token;
 
-        const headers: Record<string, string> = {
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        };
-
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits`);
-        url.searchParams.append('page', currentPage.toString());
-        url.searchParams.append('per_page', commitsPerPage.toString());
-        if (branch) {
-          url.searchParams.append('sha', branch);
-        }
-
-        const response = await fetch(url.toString(), {
-          headers,
+        const response = await githubService.getCommits(owner, repo, {
+          page: currentPage,
+          perPage: commitsPerPage,
+          sha: branch,
         });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch commits: ${response.statusText}`);
-        }
+        setCommits(response.data);
+        setHasMoreCommits(response.hasMore);
 
-        const data = await response.json();
-        setCommits(data);
-
-        setHasMoreCommits(data.length === commitsPerPage);
-
-        const linkHeader = response.headers.get('Link');
-        if (linkHeader) {
-          const lastPageMatch = linkHeader.match(/page=(\d+)>; rel="last"/);
-          if (lastPageMatch) {
-            setTotalPages(parseInt(lastPageMatch[1]));
-          }
+        if (response.totalPages) {
+          setTotalPages(response.totalPages);
         }
       } catch (err) {
         console.error('Error fetching commits:', err);
@@ -238,28 +172,7 @@ export default function RepositoryPage() {
 
   // Fetch commit details (files changed)
   const fetchCommitDetails = async (sha: string): Promise<CommitFile[]> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.provider_token;
-
-    const headers: Record<string, string> = {
-      'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/commits/${sha}`,
-      { headers }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch commit details: ${response.statusText}`);
-    }
-
-    const data = await response.json();
+    const data = await githubService.getCommit(owner, repo, sha);
     return data.files || [];
   };
 
@@ -292,37 +205,11 @@ export default function RepositoryPage() {
 
     // Fetch file content
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.provider_token;
+      const data = await githubService.getContents(owner, repo, file.path, { ref: branch });
 
-      const headers: Record<string, string> = {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(file.url, {
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch file: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Decode base64 content
-      if (data.encoding === "base64" && data.content) {
-        const decodedContent = atob(data.content.replace(/\n/g, ""));
-        setSelectedFile({
-          ...data,
-          content: decodedContent,
-        });
+      // Service already decodes base64 content
+      if (!Array.isArray(data)) {
+        setSelectedFile(data);
       }
     } catch (err) {
       console.error("Error fetching file:", err);

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
+import { githubService } from "@/lib/services/github";
 import { GitBranch, ChevronDown, Search, Loader2 } from "@workspace/ui/icons";
 import {
   DropdownMenu,
@@ -60,38 +60,18 @@ export function BranchSelector({
         setLoadingMore(true);
       }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.provider_token;
-
-      const headers: Record<string, string> = {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/branches?per_page=100&page=${pageNum}`,
-        { headers }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch branches: ${response.statusText}`);
-      }
-
-      const data: Branch[] = await response.json();
+      const response = await githubService.getBranches(owner, repo, {
+        page: pageNum,
+        perPage: 100,
+      });
 
       if (pageNum === 1) {
-        setBranches(data);
+        setBranches(response.data);
       } else {
-        setBranches(prev => [...prev, ...data]);
+        setBranches(prev => [...prev, ...response.data]);
       }
 
-      setHasMore(data.length === 100);
+      setHasMore(response.hasMore);
     } catch (err) {
       console.error("Error fetching branches:", err);
     } finally {
@@ -105,49 +85,14 @@ export function BranchSelector({
 
     try {
       setSearching(true);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.provider_token;
-
-      const headers: Record<string, string> = {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      // Use the matching refs API to search for branches
-      const response = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/git/matching-refs/heads/${encodeURIComponent(query)}`,
-        { headers }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to search branches: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Transform git refs to branch format
-      const searchResults: Branch[] = data.map((ref: any) => ({
-        name: ref.ref.replace("refs/heads/", ""),
-        commit: {
-          sha: ref.object.sha,
-          url: ref.object.url,
-        },
-        protected: false,
-      }));
-
+      const searchResults = await githubService.searchBranches(owner, repo, query);
       setFilteredBranches(searchResults);
     } catch (err) {
       console.error("Error searching branches:", err);
       // Fall back to client-side filtering
-      const query = searchQuery.toLowerCase();
+      const queryLower = searchQuery.toLowerCase();
       const filtered = branches.filter(branch =>
-        branch.name.toLowerCase().includes(query)
+        branch.name.toLowerCase().includes(queryLower)
       );
       setFilteredBranches(filtered);
     } finally {

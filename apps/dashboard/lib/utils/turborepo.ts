@@ -1,3 +1,6 @@
+import { githubService } from "@/lib/services/github";
+import { ContentItem } from "@/types/repository";
+
 export interface PackageInfo {
   name: string;
   path: string;
@@ -27,20 +30,7 @@ export async function checkIsTurborepo(
   token: string,
 ): Promise<boolean> {
   try {
-    const headers: Record<string, string> = {
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    };
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/turbo.json`,
-      { headers },
-    );
-    return response.ok;
+    return await githubService.checkFileExists(owner, repo, "turbo.json");
   } catch {
     return false;
   }
@@ -55,44 +45,7 @@ async function fetchPackageJson(
   path: string,
   token: string,
 ): Promise<PackageInfo | null> {
-  try {
-    const headers: Record<string, string> = {
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    };
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${path}/package.json`,
-      { headers },
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-
-    if (data.encoding === "base64" && data.content) {
-      const decodedContent = atob(data.content.replace(/\n/g, ""));
-      const packageJson = JSON.parse(decodedContent);
-
-      return {
-        name: packageJson.name || path.split("/").pop() || "unknown",
-        path,
-        dependencies: packageJson.dependencies || {},
-        devDependencies: packageJson.devDependencies || {},
-      };
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error fetching package.json from ${path}:`, error);
-    return null;
-  }
+  return await githubService.getPackageJson(owner, repo, path);
 }
 
 /**
@@ -105,33 +58,15 @@ async function fetchFolders(
   token: string,
 ): Promise<string[]> {
   try {
-    const headers: Record<string, string> = {
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    };
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
-      { headers },
-    );
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const data = await response.json();
+    const data = await githubService.getContents(owner, repo, path);
 
     if (!Array.isArray(data)) {
       return [];
     }
 
     return data
-      .filter((item: any) => item.type === "dir")
-      .map((item: any) => item.path);
+      .filter((item: ContentItem) => item.type === "dir")
+      .map((item: ContentItem) => item.path);
   } catch (error) {
     console.error(`Error fetching folders from ${path}:`, error);
     return [];
