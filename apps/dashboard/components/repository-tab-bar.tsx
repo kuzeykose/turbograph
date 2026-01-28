@@ -11,7 +11,7 @@ interface RepositoryTabBarProps {
 
 export function RepositoryTabBar({ dependencyCount }: RepositoryTabBarProps) {
   return (
-    <TabsList variant="line">
+    <TabsList>
       <TabsTrigger value="files">
         <Folder className="h-4 w-4" />
         Files

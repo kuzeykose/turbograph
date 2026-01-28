@@ -39,14 +39,11 @@ export default function RepositoryPage() {
   } = useRepository({ owner, repo });
 
   const {
-    currentPath,
     contents,
     selectedFile,
     loading: filesLoading,
     error: filesError,
-    pathHistory,
     handleFileClick,
-    handleBreadcrumbClick,
   } = useFileNavigation({ owner, repo, branch });
 
   const {
@@ -72,10 +69,6 @@ export default function RepositoryPage() {
   // Aggregate errors and loading states
   const error = repoError || filesError || commitsError;
   const loading = filesLoading;
-
-
-
-
 
   if (authLoading) {
     return (
@@ -145,14 +138,13 @@ export default function RepositoryPage() {
               <div>
                 <TabsContent value="files">
                   <FilesTab
+                    owner={owner}
                     repo={repo}
-                    currentPath={currentPath}
+                    branch={branch}
                     contents={contents}
                     selectedFile={selectedFile}
                     loading={loading}
-                    pathHistory={pathHistory}
                     onFileClick={handleFileClick}
-                    onBreadcrumbClick={handleBreadcrumbClick}
                   />
                 </TabsContent>
                 <TabsContent value="commits">
@@ -183,14 +175,13 @@ export default function RepositoryPage() {
           </div>
         ) : (
           <FilesTab
+            owner={owner}
             repo={repo}
-            currentPath={currentPath}
+            branch={branch}
             contents={contents}
             selectedFile={selectedFile}
             loading={loading}
-            pathHistory={pathHistory}
             onFileClick={handleFileClick}
-            onBreadcrumbClick={handleBreadcrumbClick}
           />
         )}
       </div>
