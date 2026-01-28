@@ -1,6 +1,7 @@
 import { CodeViewer } from "@/components/code-viewer";
 import { formatFileSize } from "@/lib/utils/format";
 import { ContentItem, FileContent } from "@/types/repository";
+import { Folder, File, ChevronRight, FileText } from "@workspace/ui/icons";
 
 interface FilesTabProps {
   repo: string;
@@ -15,29 +16,9 @@ interface FilesTabProps {
 
 function getFileIcon(type: string, name: string) {
   if (type === "dir") {
-    return (
-      <svg
-        className="h-5 w-5 text-blue-500"
-        fill="currentColor"
-        viewBox="0 0 20 20"
-      >
-        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-      </svg>
-    );
+    return <Folder className="h-5 w-5 text-blue-500" />;
   }
-  return (
-    <svg
-      className="h-5 w-5 text-zinc-500"
-      fill="currentColor"
-      viewBox="0 0 20 20"
-    >
-      <path
-        fillRule="evenodd"
-        d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
+  return <File className="h-5 w-5 text-zinc-500" />;
 }
 
 function getLanguageFromFilename(filename: string): string {
@@ -147,19 +128,7 @@ export function FilesTab({
                           )}
                       </div>
                       {item.type === "dir" && (
-                        <svg
-                          className="h-4 w-4 text-zinc-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
+                        <ChevronRight className="h-4 w-4 text-zinc-400" />
                       )}
                     </button>
                   ))}
@@ -183,19 +152,7 @@ export function FilesTab({
           ) : (
             <div className="flex min-h-[calc(100vh-300px)] items-center justify-center p-8">
               <div className="text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-zinc-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
+                <FileText className="mx-auto h-12 w-12 text-zinc-400" />
                 <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
                   Select a file to view its contents
                 </p>

@@ -1,5 +1,6 @@
 import { TurborepoGraph } from "@/components/turborepo-graph";
 import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
+import { Archive } from "@workspace/ui/icons";
 
 interface DependenciesTabProps {
   turborepoStructure: TurborepoStructure;
@@ -38,19 +39,7 @@ export function DependenciesTab({
           {turborepoStructure.apps.length === 0 &&
           turborepoStructure.packages.length === 0 ? (
             <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800 dark:bg-zinc-800">
-              <svg
-                className="mx-auto h-12 w-12 text-zinc-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                />
-              </svg>
+              <Archive className="mx-auto h-12 w-12 text-zinc-400" />
               <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
                 No apps or packages found in this Turborepo
               </p>

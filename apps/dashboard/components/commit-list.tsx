@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { TurborepoStructure, DependencyEdge, getAffectedPackages, getDownstreamDependents } from '@/lib/utils/turborepo';
+import { User, ChevronRight, ChevronLeft } from '@workspace/ui/icons';
 
 export interface CommitFile {
     filename: string;
@@ -181,27 +182,20 @@ export function CommitList({
                                             />
                                         ) : (
                                             <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-                                                <svg className="h-4 w-4 text-zinc-500 dark:text-zinc-400" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                                                </svg>
+                                                <User className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
                                             </div>
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <svg
-                                                    className={`h-4 w-4 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                                </svg>
-                                                <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50 hover:underline hover:text-blue-600 dark:hover:text-blue-400 truncate">
-                                                    {commit.commit.message.split('\n')[0]}
-                                                </span>
-                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    <ChevronRight
+                                                        className={`h-4 w-4 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                                    />
+                                                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50 hover:underline hover:text-blue-600 dark:hover:text-blue-400 truncate">
+                                                        {commit.commit.message.split('\n')[0]}
+                                                    </span>
+                                                </div>
                                             <div className="flex-shrink-0 flex items-center gap-2">
                                                 <span className="hidden sm:inline-block px-2 py-0.5 text-xs font-mono bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
                                                     {commit.sha.substring(0, 7)}
@@ -326,9 +320,7 @@ export function CommitList({
                             disabled={!hasPrevious}
                             className="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                         >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
+                            <ChevronLeft className="h-4 w-4" />
                             Previous
                         </button>
                     </div>
@@ -345,9 +337,7 @@ export function CommitList({
                             className="inline-flex items-center gap-2 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
                         >
                             Next
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                            <ChevronRight className="h-4 w-4" />
                         </button>
                     </div>
                 </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { DependencyEdge, PackageInfo } from '@/lib/utils/turborepo';
 import { TurborepoGraphVisual } from './turborepo-graph-visual';
+import { BarChart3, List } from '@workspace/ui/icons';
 
 interface TurborepoGraphProps {
   apps: PackageInfo[];
@@ -43,9 +44,7 @@ export function TurborepoGraph({ apps, packages, dependencies }: TurborepoGraphP
                 : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
             }`}
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+            <BarChart3 className="h-4 w-4" />
             Graph View
           </button>
           <button
@@ -56,9 +55,7 @@ export function TurborepoGraph({ apps, packages, dependencies }: TurborepoGraphP
                 : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
             }`}
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
+            <List className="h-4 w-4" />
             List View
           </button>
         </div>

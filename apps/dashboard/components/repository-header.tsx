@@ -28,7 +28,7 @@ export function RepositoryHeader({
     : "#888";
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 mb-4 border-b border-zinc-200 dark:border-zinc-800">
+    <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
       {/* Left: Breadcrumb navigation */}
       <div className="flex items-center gap-4 min-w-0">
         <Link
