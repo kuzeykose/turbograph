@@ -1,6 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
+import {
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  MousePointer2,
+  Move,
+  Box,
+  Boxes,
+} from "@workspace/ui/icons";
+import { cn } from "@workspace/ui/lib/utils";
 import { DependencyEdge, PackageInfo } from "@/lib/utils/turborepo";
 
 interface Node {
@@ -13,9 +25,12 @@ interface Node {
   vy: number;
   fx?: number;
   fy?: number;
+  dependencies: number;
+  dependents: number;
 }
 
 interface Edge {
+  id: string;
   source: string;
   target: string;
   type: "dependency" | "devDependency";
@@ -27,75 +42,92 @@ interface TurborepoGraphVisualProps {
   dependencies: DependencyEdge[];
 }
 
+// Node colors by type
+const nodeColors = {
+  app: { fill: "oklch(0.65 0.18 265)", stroke: "oklch(0.55 0.2 265)" },
+  package: { fill: "oklch(0.7 0.16 180)", stroke: "oklch(0.6 0.18 180)" },
+};
+
+// Edge colors by type
+const edgeColors = {
+  dependency: "oklch(0.65 0.18 265)",
+  devDependency: "oklch(0.72 0.16 85)",
+};
+
+// Node type icons
+const NodeIcon = ({ type }: { type: Node["type"] }) => {
+  const iconProps = { size: 14, strokeWidth: 2 };
+  switch (type) {
+    case "app":
+      return <Box {...iconProps} />;
+    case "package":
+      return <Boxes {...iconProps} />;
+  }
+};
+
 export function TurborepoGraphVisual({
   apps,
   packages,
   dependencies,
 }: TurborepoGraphVisualProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
-  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 0, height: 800 });
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 900, height: 550 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const initialViewBoxRef = useRef({ width: 0, height: 800 });
+  const [zoom, setZoom] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const initialViewBoxRef = useRef({ x: 0, y: 0, width: 900, height: 550 });
 
   // Initialize viewBox based on actual SVG dimensions
   useLayoutEffect(() => {
     const updateViewBox = () => {
       if (svgRef.current) {
         const rect = svgRef.current.getBoundingClientRect();
-        const width = rect.width || 1200;
-        const height = 800;
+        const width = rect.width || 900;
+        const height = isFullscreen ? rect.height : 500;
+        const aspectRatio = 900 / 550;
+        const adjustedHeight = width / aspectRatio;
 
-        // Only update initialViewBoxRef if it's the first time (width is 0)
         if (initialViewBoxRef.current.width === 0) {
-          initialViewBoxRef.current = { width, height };
+          initialViewBoxRef.current = { x: 0, y: 0, width: 900, height: 550 };
         }
 
-        setViewBox((prev) => {
-          // Maintain the same zoom level and pan position
-          const scaleX = width / (prev.width || width);
-          const scaleY = height / (prev.height || height);
-
-          return {
-            x: prev.x * scaleX,
-            y: prev.y * scaleY,
-            width,
-            height,
-          };
-        });
+        setViewBox((prev) => ({
+          ...prev,
+          width: prev.width || 900,
+          height: prev.height || 550,
+        }));
       }
     };
 
-    // Initial update
     updateViewBox();
-
-    // Add resize listener
     window.addEventListener("resize", updateViewBox);
-
-    return () => {
-      window.removeEventListener("resize", updateViewBox);
-    };
-  }, []);
+    return () => window.removeEventListener("resize", updateViewBox);
+  }, [isFullscreen]);
 
   // Initialize nodes and edges with hierarchical layout
   useEffect(() => {
-    const width = 1200;
-    const height = 800;
-    const padding = 100;
+    const width = 900;
+    const height = 550;
+    const padding = 80;
 
-    // Create edges first (needed for depth calculation)
-    const newEdges: Edge[] = dependencies.map((dep) => ({
+    // Create edges first
+    const newEdges: Edge[] = dependencies.map((dep, idx) => ({
+      id: `e${idx}`,
       source: dep.from,
       target: dep.to,
       type: dep.type,
     }));
 
-    // Build adjacency list for dependency graph (reverse direction for depth calc)
-    // If A depends on B, then B should be at a lower depth (leftmost)
+    // Build adjacency list for dependency graph
     const dependsOn = new Map<string, Set<string>>();
     const dependedBy = new Map<string, Set<string>>();
 
@@ -109,16 +141,22 @@ export function TurborepoGraphVisual({
     });
 
     dependencies.forEach((dep) => {
-      // dep.from depends on dep.to
       dependsOn.get(dep.from)?.add(dep.to);
       dependedBy.get(dep.to)?.add(dep.from);
     });
 
-    // Calculate depth using BFS from leaf nodes (nodes with no dependencies)
+    // Calculate dependency and dependent counts
+    const dependencyCount = new Map<string, number>();
+    const dependentCount = new Map<string, number>();
+    allNodeIds.forEach((id) => {
+      dependencyCount.set(id, dependsOn.get(id)?.size || 0);
+      dependentCount.set(id, dependedBy.get(id)?.size || 0);
+    });
+
+    // Calculate depth using BFS from leaf nodes
     const nodeDepth = new Map<string, number>();
     const queue: string[] = [];
 
-    // Find leaf nodes (packages/apps that don't depend on anything)
     allNodeIds.forEach((id) => {
       if (dependsOn.get(id)?.size === 0) {
         nodeDepth.set(id, 0);
@@ -126,7 +164,6 @@ export function TurborepoGraphVisual({
       }
     });
 
-    // BFS to calculate depths
     while (queue.length > 0) {
       const current = queue.shift()!;
       const currentDepth = nodeDepth.get(current)!;
@@ -139,10 +176,9 @@ export function TurborepoGraphVisual({
           nodeDepth.set(parent, newDepth);
         }
 
-        // Check if all dependencies of parent have been processed
         const parentDeps = dependsOn.get(parent);
         const allDepsProcessed = [...(parentDeps || [])].every((dep) =>
-          nodeDepth.has(dep),
+          nodeDepth.has(dep)
         );
 
         if (allDepsProcessed && !queue.includes(parent)) {
@@ -151,7 +187,7 @@ export function TurborepoGraphVisual({
       });
     }
 
-    // Handle any remaining nodes (cycles or disconnected)
+    // Handle remaining nodes
     allNodeIds.forEach((id) => {
       if (!nodeDepth.has(id)) {
         nodeDepth.set(id, 0);
@@ -178,8 +214,7 @@ export function TurborepoGraphVisual({
 
     nodesByDepth.forEach((nodesAtDepth, depth) => {
       const x = padding + depth * levelWidth;
-      const verticalSpacing =
-        (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
+      const verticalSpacing = (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
 
       nodesAtDepth.forEach((nodeId, index) => {
         const y = padding + verticalSpacing * (index + 0.5);
@@ -191,6 +226,8 @@ export function TurborepoGraphVisual({
           y,
           vx: 0,
           vy: 0,
+          dependencies: dependencyCount.get(nodeId) || 0,
+          dependents: dependentCount.get(nodeId) || 0,
         });
       });
     });
@@ -199,7 +236,7 @@ export function TurborepoGraphVisual({
     setEdges(newEdges);
   }, [apps, packages, dependencies]);
 
-  // Apply force simulation (primarily vertical to maintain hierarchical layers)
+  // Apply force simulation
   useEffect(() => {
     if (nodes.length === 0) return;
 
@@ -213,41 +250,32 @@ export function TurborepoGraphVisual({
           let fx = 0;
           let fy = 0;
 
-          // Vertical repulsion between nodes (stronger for nodes at same x-level)
           prevNodes.forEach((other) => {
             if (other.id !== node.id) {
               const dx = node.x - other.x;
               const dy = node.y - other.y;
               const distance = Math.sqrt(dx * dx + dy * dy);
 
-              // Strong vertical repulsion for nodes at similar x positions (same layer)
               const sameLayer = Math.abs(dx) < 100;
               const repulsionDistance = sameLayer ? 150 : 100;
 
               if (distance < repulsionDistance && distance > 0) {
                 const force = (sameLayer ? 400 : 100) / (distance * distance);
-                // Primarily apply vertical force to maintain layers
                 fx += (dx / distance) * force * 0.1;
                 fy += (dy / distance) * force;
               }
             }
           });
 
-          // Weak vertical centering to keep nodes within view
-          const fixedHeight = 800;
+          const fixedHeight = 550;
           fy += (fixedHeight / 2 - node.y) * 0.002;
 
-          // Apply damping
           const damping = 0.7;
           const newVx = (node.vx + fx) * damping;
           const newVy = (node.vy + fy) * damping;
 
-          // Update position - keep x mostly stable, allow y to adjust
-          const fixedWidth = 1200;
-          const newX = Math.max(
-            50,
-            Math.min(fixedWidth - 50, node.x + newVx * 0.3),
-          );
+          const fixedWidth = 900;
+          const newX = Math.max(50, Math.min(fixedWidth - 50, node.x + newVx * 0.3));
           const newY = Math.max(50, Math.min(fixedHeight - 50, node.y + newVy));
 
           return { ...node, x: newX, y: newY, vx: newVx, vy: newVy };
@@ -255,287 +283,548 @@ export function TurborepoGraphVisual({
       });
     };
 
-    const interval = setInterval(animate, 50);
-    const timeout = setTimeout(() => clearInterval(interval), 2000);
+    // const interval = setInterval(animate, 50);
+    // const timeout = setTimeout(() => clearInterval(interval), 2000);
 
     return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
+      // clearInterval(interval);
+      // clearTimeout(timeout);
     };
   }, [edges]);
 
-  const handleMouseDown = (nodeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDraggedNode(nodeId);
-    setSelectedNode(nodeId);
-  };
+  // Get connected nodes for highlighting
+  const connectedNodes = useMemo(() => {
+    if (!selectedNode && !hoveredNode) return new Set<string>();
+    const activeNode = selectedNode || hoveredNode;
+    const connected = new Set<string>();
+    connected.add(activeNode!);
+    edges.forEach((edge) => {
+      if (edge.source === activeNode) connected.add(edge.target);
+      if (edge.target === activeNode) connected.add(edge.source);
+    });
+    return connected;
+  }, [selectedNode, hoveredNode, edges]);
 
-  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (draggedNode) {
+  // Get connected edges for highlighting
+  const connectedEdges = useMemo(() => {
+    if (!selectedNode && !hoveredNode) return new Set<string>();
+    const activeNode = selectedNode || hoveredNode;
+    const connected = new Set<string>();
+    edges.forEach((edge) => {
+      if (edge.source === activeNode || edge.target === activeNode) {
+        connected.add(edge.id);
+      }
+    });
+    return connected;
+  }, [selectedNode, hoveredNode, edges]);
+
+  // SVG coordinate conversion
+  const getSvgPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!svgRef.current) return { x: 0, y: 0 };
       const svg = svgRef.current;
-      if (!svg) return;
-
       const rect = svg.getBoundingClientRect();
-      const scaleX = viewBox.width / rect.width;
-      const scaleY = viewBox.height / rect.height;
+      const x = ((clientX - rect.left) / rect.width) * viewBox.width + viewBox.x;
+      const y = ((clientY - rect.top) / rect.height) * viewBox.height + viewBox.y;
+      return { x, y };
+    },
+    [viewBox]
+  );
 
-      const x = viewBox.x + (e.clientX - rect.left) * scaleX;
-      const y = viewBox.y + (e.clientY - rect.top) * scaleY;
+  // Zoom handlers
+  const handleZoom = useCallback((delta: number, centerX?: number, centerY?: number) => {
+    setViewBox((prev) => {
+      const factor = delta > 0 ? 0.9 : 1.1;
+      const newWidth = prev.width * factor;
+      const newHeight = prev.height * factor;
 
-      setNodes((prevNodes) =>
-        prevNodes.map((node) =>
-          node.id === draggedNode
-            ? { ...node, x, y, fx: x, fy: y, vx: 0, vy: 0 }
-            : node,
-        ),
-      );
-    } else if (isPanning) {
-      const dx = (e.clientX - panStart.x) * -1;
-      const dy = (e.clientY - panStart.y) * -1;
+      if (newWidth < 200 || newWidth > 2000) return prev;
 
-      setViewBox((prev) => ({
-        ...prev,
-        x: prev.x + dx,
-        y: prev.y + dy,
-      }));
+      const cx = centerX ?? prev.x + prev.width / 2;
+      const cy = centerY ?? prev.y + prev.height / 2;
 
-      setPanStart({ x: e.clientX, y: e.clientY });
-    }
-  };
+      const newX = cx - (cx - prev.x) * factor;
+      const newY = cy - (cy - prev.y) * factor;
 
-  const handleMouseUp = () => {
+      setZoom(900 / newWidth);
+      return { x: newX, y: newY, width: newWidth, height: newHeight };
+    });
+  }, []);
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      const point = getSvgPoint(e.clientX, e.clientY);
+      handleZoom(e.deltaY, point.x, point.y);
+    },
+    [getSvgPoint, handleZoom]
+  );
+
+  // Pan handlers
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.target === svgRef.current || (e.target as Element).classList.contains("graph-bg")) {
+        setIsPanning(true);
+        setPanStart(getSvgPoint(e.clientX, e.clientY));
+        setSelectedNode(null);
+      }
+    },
+    [getSvgPoint]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (isPanning) {
+        const current = getSvgPoint(e.clientX, e.clientY);
+        setViewBox((prev) => ({
+          ...prev,
+          x: prev.x + (panStart.x - current.x),
+          y: prev.y + (panStart.y - current.y),
+        }));
+      } else if (draggedNode) {
+        const point = getSvgPoint(e.clientX, e.clientY);
+        setNodes((prev) =>
+          prev.map((node) =>
+            node.id === draggedNode
+              ? { ...node, x: point.x - dragOffset.x, y: point.y - dragOffset.y, fx: point.x - dragOffset.x, fy: point.y - dragOffset.y }
+              : node
+          )
+        );
+      }
+    },
+    [isPanning, panStart, getSvgPoint, draggedNode, dragOffset]
+  );
+
+  const handleMouseUp = useCallback(() => {
     if (draggedNode) {
       setNodes((prevNodes) =>
         prevNodes.map((node) =>
           node.id === draggedNode
             ? { ...node, fx: undefined, fy: undefined }
-            : node,
-        ),
+            : node
+        )
       );
     }
-    setDraggedNode(null);
     setIsPanning(false);
-  };
+    setDraggedNode(null);
+  }, [draggedNode]);
 
-  const handleSvgMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button === 0 && !draggedNode) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX, y: e.clientY });
+  // Node drag handlers
+  const handleNodeMouseDown = useCallback(
+    (nodeId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      const point = getSvgPoint(e.clientX, e.clientY);
+      const node = nodes.find((n) => n.id === nodeId);
+      if (node) {
+        setDragOffset({ x: point.x - node.x, y: point.y - node.y });
+        setDraggedNode(nodeId);
+      }
+    },
+    [getSvgPoint, nodes]
+  );
+
+  const handleNodeClick = useCallback((nodeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedNode((prev) => (prev === nodeId ? null : nodeId));
+  }, []);
+
+  // Control functions
+  const resetView = useCallback(() => {
+    setViewBox({ x: 0, y: 0, width: 900, height: 550 });
+    setZoom(1);
+    setSelectedNode(null);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!containerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
     }
-  };
+  }, []);
 
-  const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    const scaleFactor = e.deltaY > 0 ? 1.1 : 0.9;
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
-    setViewBox((prev) => ({
-      ...prev,
-      width: prev.width * scaleFactor,
-      height: prev.height * scaleFactor,
-    }));
-  };
+  const fitView = useCallback(() => {
+    const padding = 80;
+    const nodeRadius = 36;
 
-  const resetView = () => {
-    setViewBox({ x: 0, y: 0, ...initialViewBoxRef.current });
-  };
+    if (nodes.length === 0) return;
 
-  const getNodeColor = (type: "app" | "package") => {
-    return type === "app" ? "#3b82f6" : "#a855f7";
-  };
+    const minX = Math.min(...nodes.map((n) => n.x)) - padding - nodeRadius;
+    const maxX = Math.max(...nodes.map((n) => n.x)) + padding + nodeRadius;
+    const minY = Math.min(...nodes.map((n) => n.y)) - padding - nodeRadius;
+    const maxY = Math.max(...nodes.map((n) => n.y)) + padding + nodeRadius;
 
-  const getEdgeColor = (type: "dependency" | "devDependency") => {
-    return type === "dependency" ? "#10b981" : "#f59e0b";
-  };
+    const contentWidth = maxX - minX;
+    const contentHeight = maxY - minY;
 
-  // Get connected nodes for highlighting
-  const getConnectedNodes = (nodeId: string): Set<string> => {
-    const connected = new Set<string>([nodeId]);
-    edges.forEach((edge) => {
-      if (edge.source === nodeId) connected.add(edge.target);
-      if (edge.target === nodeId) connected.add(edge.source);
-    });
-    return connected;
-  };
+    const targetAspect = 900 / 550;
+    const contentAspect = contentWidth / contentHeight;
 
-  const connectedNodes = selectedNode
-    ? getConnectedNodes(selectedNode)
-    : new Set<string>();
+    let finalWidth = contentWidth;
+    let finalHeight = contentHeight;
+    let finalX = minX;
+    let finalY = minY;
+
+    if (contentAspect > targetAspect) {
+      finalHeight = contentWidth / targetAspect;
+      finalY = minY - (finalHeight - contentHeight) / 2;
+    } else {
+      finalWidth = contentHeight * targetAspect;
+      finalX = minX - (finalWidth - contentWidth) / 2;
+    }
+
+    setViewBox({ x: finalX, y: finalY, width: finalWidth, height: finalHeight });
+    setZoom(900 / finalWidth);
+  }, [nodes]);
+
+  // Calculate edge path with curve
+  const getEdgePath = useCallback(
+    (edge: Edge) => {
+      const source = nodes.find((n) => n.id === edge.source);
+      const target = nodes.find((n) => n.id === edge.target);
+      if (!source || !target) return "";
+
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist === 0) return "";
+
+      const nodeRadius = 36;
+      const sourceX = source.x + (dx / dist) * nodeRadius;
+      const sourceY = source.y + (dy / dist) * nodeRadius;
+      const targetX = target.x - (dx / dist) * (nodeRadius + 8);
+      const targetY = target.y - (dy / dist) * (nodeRadius + 8);
+
+      const midX = (sourceX + targetX) / 2;
+      const midY = (sourceY + targetY) / 2;
+      const offset = dist * 0.1;
+      const perpX = -dy / dist;
+      const perpY = dx / dist;
+
+      return `M ${sourceX} ${sourceY} Q ${midX + perpX * offset} ${midY + perpY * offset} ${targetX} ${targetY}`;
+    },
+    [nodes]
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedNode(null);
+      } else if (e.key === "+" || e.key === "=") {
+        handleZoom(1);
+      } else if (e.key === "-") {
+        handleZoom(-1);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleZoom]);
+
+  const selectedNodeData = selectedNode ? nodes.find((n) => n.id === selectedNode) : null;
 
   return (
-    <div className="relative">
-      {/* Controls */}
-      <div className="absolute left-4 top-4 z-10 flex gap-2">
-        <button
-          onClick={resetView}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-        >
-          Reset View
-        </button>
-        <button
-          onClick={() => setSelectedNode(null)}
-          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
-        >
-          Clear Selection
-        </button>
+    <div ref={containerRef} className={cn(
+      "relative flex flex-col overflow-hidden rounded-xl border border-border bg-card",
+      isFullscreen && "h-screen w-screen rounded-none"
+    )}>
+      {/* Header with controls */}
+      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-foreground">Dependency Graph</h3>
+          <span className="rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+            {nodes.length} packages
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => handleZoom(1)}
+            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            title="Zoom In"
+          >
+            <ZoomIn size={16} />
+          </button>
+          <button
+            onClick={() => handleZoom(-1)}
+            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            title="Zoom Out"
+          >
+            <ZoomOut size={16} />
+          </button>
+          <button
+            onClick={fitView}
+            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            title="Fit View"
+          >
+            <Maximize2 size={16} />
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+          <button
+            onClick={resetView}
+            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            title="Reset View"
+          >
+            <RotateCcw size={16} />
+          </button>
+          <div className="mx-2 h-4 w-px bg-border" />
+          <span className="text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
+        </div>
       </div>
 
-      {/* Instructions */}
-      <div className="absolute right-4 top-4 z-10 rounded-lg border border-zinc-200 bg-white/90 p-3 text-xs text-zinc-600 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-400">
-        <p className="font-semibold">Controls:</p>
-        <ul className="mt-1 space-y-0.5">
-          <li>• Drag nodes to reposition</li>
-          <li>• Click node to highlight connections</li>
-          <li>• Drag background to pan</li>
-          <li>• Scroll to zoom</li>
-        </ul>
-      </div>
+      {/* Graph canvas */}
+      <div className="relative flex-1">
+        <svg
+          ref={svgRef}
+          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+          className={cn(
+            "w-full",
+            isFullscreen ? "h-full" : "h-[500px]",
+            isPanning ? "cursor-grabbing" : draggedNode ? "cursor-move" : "cursor-grab"
+          )}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onWheel={handleWheel}
+        >
+          {/* Background pattern */}
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="1" fill="oklch(0.25 0 0)" />
+            </pattern>
+            {/* Arrow markers */}
+            <marker id="arrow-dependency" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.dependency} />
+            </marker>
+            <marker id="arrow-devDependency" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.devDependency} />
+            </marker>
+            {/* Glow filter */}
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
 
-      {/* Graph */}
-      <svg
-        ref={svgRef}
-        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-        className="h-[800px] w-full cursor-move rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950"
-        onMouseDown={handleSvgMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
-      >
-        {/* Define arrow markers */}
-        <defs>
-          <marker
-            id="arrowhead-dependency"
-            markerWidth="10"
-            markerHeight="10"
-            refX="9"
-            refY="3"
-            orient="auto"
-          >
-            <polygon points="0 0, 10 3, 0 6" fill="#10b981" />
-          </marker>
-          <marker
-            id="arrowhead-devDependency"
-            markerWidth="10"
-            markerHeight="10"
-            refX="9"
-            refY="3"
-            orient="auto"
-          >
-            <polygon points="0 0, 10 3, 0 6" fill="#f59e0b" />
-          </marker>
-        </defs>
+          {/* Grid background */}
+          <rect className="graph-bg" x={viewBox.x - 500} y={viewBox.y - 500} width={viewBox.width + 1000} height={viewBox.height + 1000} fill="url(#grid)" />
 
-        {/* Draw edges */}
-        <g className="edges">
-          {edges.map((edge, i) => {
-            const sourceNode = nodes.find((n) => n.id === edge.source);
-            const targetNode = nodes.find((n) => n.id === edge.target);
-
-            if (!sourceNode || !targetNode) return null;
-
-            const isHighlighted =
-              selectedNode &&
-              (edge.source === selectedNode || edge.target === selectedNode);
-
-            return (
-              <line
-                key={i}
-                x1={sourceNode.x}
-                y1={sourceNode.y}
-                x2={targetNode.x}
-                y2={targetNode.y}
-                stroke={getEdgeColor(edge.type)}
-                strokeWidth={isHighlighted ? 3 : 2}
-                strokeOpacity={selectedNode && !isHighlighted ? 0.2 : 0.6}
-                markerEnd={`url(#arrowhead-${edge.type})`}
-              />
-            );
-          })}
-        </g>
-
-        {/* Draw nodes */}
-        <g className="nodes">
-          {nodes.map((node) => {
-            const isHighlighted = connectedNodes.has(node.id);
-            const isSelected = selectedNode === node.id;
-
-            return (
-              <g
-                key={node.id}
-                transform={`translate(${node.x}, ${node.y})`}
-                onMouseDown={(e) => handleMouseDown(node.id, e)}
-                className="cursor-pointer"
-                style={{ opacity: selectedNode && !isHighlighted ? 0.3 : 1 }}
-              >
-                {/* Node circle */}
-                <circle
-                  r={isSelected ? 50 : 40}
-                  fill={getNodeColor(node.type)}
-                  stroke={isSelected ? "#fbbf24" : "white"}
-                  strokeWidth={isSelected ? 4 : 2}
-                  className="transition-all duration-200"
+          {/* Edges */}
+          <g className="edges">
+            {edges.map((edge) => {
+              const isConnected = connectedEdges.has(edge.id);
+              const hasSelection = selectedNode || hoveredNode;
+              const isDragging = !!draggedNode;
+              return (
+                <path
+                  key={edge.id}
+                  d={getEdgePath(edge)}
+                  fill="none"
+                  stroke={edgeColors[edge.type]}
+                  strokeWidth={isConnected ? 2.5 : 1.5}
+                  strokeOpacity={hasSelection ? (isConnected ? 1 : 0.15) : 0.6}
+                  strokeDasharray={edge.type === "devDependency" ? "6 4" : "none"}
+                  markerEnd={`url(#arrow-${edge.type})`}
+                  className={isDragging ? "" : "transition-all duration-200"}
                 />
+              );
+            })}
+          </g>
 
-                {/* Node label */}
-                <text
-                  textAnchor="middle"
-                  dy=".35em"
-                  fill="white"
-                  fontSize="12"
-                  fontWeight="600"
-                  className="pointer-events-none select-none"
-                >
-                  {node.name.length > 15
-                    ? node.name.substring(0, 12) + "..."
-                    : node.name}
-                </text>
+          {/* Nodes */}
+          <g className="nodes">
+            {nodes.map((node) => {
+              const isSelected = selectedNode === node.id;
+              const isHovered = hoveredNode === node.id;
+              const isConnected = connectedNodes.has(node.id);
+              const hasSelection = selectedNode || hoveredNode;
+              const colors = nodeColors[node.type];
 
-                {/* Type badge */}
-                <text
-                  textAnchor="middle"
-                  y="55"
-                  fill={getNodeColor(node.type)}
-                  fontSize="10"
-                  fontWeight="600"
-                  className="pointer-events-none select-none"
+              return (
+                <g
+                  key={node.id}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  onMouseDown={(e) => handleNodeMouseDown(node.id, e)}
+                  onClick={(e) => handleNodeClick(node.id, e)}
+                  onMouseEnter={() => setHoveredNode(node.id)}
+                  onMouseLeave={() => setHoveredNode(null)}
+                  className="cursor-pointer"
+                  style={{
+                    opacity: hasSelection && !isConnected ? 0.25 : 1,
+                    transition: "opacity 0.2s ease",
+                  }}
+                  filter={isSelected || isHovered ? "url(#glow)" : undefined}
                 >
-                  {node.type}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-      </svg>
+                  {/* Node circle */}
+                  <circle
+                    r={isSelected ? 40 : isHovered ? 38 : 36}
+                    fill={colors.fill}
+                    stroke={isSelected ? "oklch(0.95 0 0)" : colors.stroke}
+                    strokeWidth={isSelected ? 3 : 2}
+                    className="transition-all duration-150"
+                  />
+
+                  {/* Inner ring */}
+                  <circle
+                    r={28}
+                    fill="none"
+                    stroke="oklch(0.95 0 0 / 0.15)"
+                    strokeWidth={1}
+                  />
+
+                  {/* Icon */}
+                  <foreignObject x={-7} y={-18} width={14} height={14} className="pointer-events-none">
+                    <div className="flex h-full items-center justify-center text-foreground/90">
+                      <NodeIcon type={node.type} />
+                    </div>
+                  </foreignObject>
+
+                  {/* Label */}
+                  <text
+                    textAnchor="middle"
+                    y={4}
+                    fill="oklch(0.95 0 0)"
+                    fontSize="10"
+                    fontWeight="600"
+                    fontFamily="system-ui, sans-serif"
+                    className="pointer-events-none select-none"
+                  >
+                    {node.name.split("/").pop()?.substring(0, 12) || node.name.substring(0, 12)}
+                  </text>
+
+                  {/* Stats */}
+                  <text
+                    textAnchor="middle"
+                    y={17}
+                    fill="oklch(0.95 0 0 / 0.6)"
+                    fontSize="8"
+                    fontFamily="system-ui, sans-serif"
+                    className="pointer-events-none select-none"
+                  >
+                    {node.dependencies}d / {node.dependents}r
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+
+        {/* Instructions overlay */}
+        <div className="absolute bottom-4 left-4 flex items-center gap-4 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
+          <div className="flex items-center gap-1.5">
+            <MousePointer2 size={12} />
+            <span>Click to select</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Move size={12} />
+            <span>Drag to move</span>
+          </div>
+          <div className="h-3 w-px bg-border" />
+          <span>Scroll to zoom</span>
+        </div>
+
+        {/* Selected node details */}
+        {selectedNodeData && (
+          <div className="absolute right-4 top-4 w-64 rounded-lg border border-border bg-card p-4 shadow-lg">
+            <div className="mb-3 flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="flex h-6 w-6 items-center justify-center rounded-md"
+                    style={{ backgroundColor: nodeColors[selectedNodeData.type].fill }}
+                  >
+                    <NodeIcon type={selectedNodeData.type} />
+                  </div>
+                  <span className="text-sm font-semibold text-foreground">
+                    {selectedNodeData.name.split("/").pop()}
+                  </span>
+                </div>
+                <span className="mt-1 block text-xs text-muted-foreground">{selectedNodeData.name}</span>
+              </div>
+              <button
+                onClick={() => setSelectedNode(null)}
+                className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-md bg-secondary p-2">
+                <div className="text-lg font-semibold text-foreground">{selectedNodeData.dependencies}</div>
+                <div className="text-xs text-muted-foreground">Dependencies</div>
+              </div>
+              <div className="rounded-md bg-secondary p-2">
+                <div className="text-lg font-semibold text-foreground">{selectedNodeData.dependents}</div>
+                <div className="text-xs text-muted-foreground">Dependents</div>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <span
+                className="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+                style={{
+                  backgroundColor: `color-mix(in oklch, ${nodeColors[selectedNodeData.type].fill}, transparent 80%)`,
+                  color: nodeColors[selectedNodeData.type].fill,
+                }}
+              >
+                {selectedNodeData.type}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Legend */}
-      <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <h4 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-          Legend
-        </h4>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-6">
+          <span className="text-xs font-medium text-muted-foreground">Nodes</span>
+          {(["app", "package"] as const).map((type) => (
+            <div key={type} className="flex items-center gap-2">
+              <div
+                className="flex h-5 w-5 items-center justify-center rounded-full"
+                style={{ backgroundColor: nodeColors[type].fill }}
+              >
+                <NodeIcon type={type} />
+              </div>
+              <span className="text-xs capitalize text-muted-foreground">{type === "app" ? "Application" : "Package"}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-6">
+          <span className="text-xs font-medium text-muted-foreground">Edges</span>
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-full bg-blue-500" />
-            <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              Application
-            </span>
+            <div className="h-0.5 w-5 rounded-full" style={{ backgroundColor: edgeColors.dependency }} />
+            <span className="text-xs text-muted-foreground">Dependency</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-full bg-purple-500" />
-            <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              Package
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-0.5 w-6 bg-green-500" />
-            <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              Dependency
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-0.5 w-6 bg-orange-500" />
-            <span className="text-xs text-zinc-600 dark:text-zinc-400">
-              Dev Dependency
-            </span>
+            <div className="h-0.5 w-5 rounded-full" style={{ backgroundColor: edgeColors.devDependency, backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 3px, oklch(0.09 0 0) 3px, oklch(0.09 0 0) 5px)" }} />
+            <span className="text-xs text-muted-foreground">Dev</span>
           </div>
         </div>
       </div>

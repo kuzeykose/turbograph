@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { SignOutButton } from '@/components/auth/sign-out-button';
-import Image from 'next/image';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
