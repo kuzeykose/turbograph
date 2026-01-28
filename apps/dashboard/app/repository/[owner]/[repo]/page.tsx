@@ -1,25 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { githubService } from "@/lib/services/github";
-import {
-  analyzeTurborepo,
-  buildDependencyGraph,
-  TurborepoStructure,
-  DependencyEdge,
-} from "@/lib/utils/turborepo";
 import Link from "next/link";
-import { Repository, ContentItem, FileContent } from "@/types/repository";
-import { RepositoryHeader } from "@/components/repository-header";
-import { CommitFile } from "@/components/commit-list";
 import { Tabs, TabsContent } from "@workspace/ui/components/tabs";
+import { Info } from "@workspace/ui/icons";
+import { RepositoryHeader } from "@/components/repository-header";
 import { RepositoryTabBar } from "@/components/repository-tab-bar";
 import { FilesTab } from "@/components/files-tab";
 import { CommitsTab } from "@/components/commits-tab";
 import { DependenciesTab } from "@/components/dependencies-tab";
-import { isBinaryFile } from "@/lib/utils/format";
+import { useRepository } from "@/hooks/use-repository";
+import { useFileNavigation } from "@/hooks/use-file-navigation";
+import { useCommitHistory } from "@/hooks/use-commit-history";
+import { useImpactAnalysis } from "@/hooks/use-impact-analysis";
 
 export default function RepositoryPage() {
   const params = useParams();
@@ -30,198 +25,57 @@ export default function RepositoryPage() {
   const repo = params.repo as string;
   const branch = searchParams.get("branch") || undefined;
 
-  const [repository, setRepository] = useState<Repository | null>(null);
-  const [currentPath, setCurrentPath] = useState<string>("");
-  const [contents, setContents] = useState<ContentItem[]>([]);
-  const [selectedFile, setSelectedFile] = useState<FileContent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [pathHistory, setPathHistory] = useState<string[]>([""]);
-
-  // Commits state
-  const [commits, setCommits] = useState<import("@/components/commit-list").Commit[]>([]);
-  const [commitsLoading, setCommitsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [hasMoreCommits, setHasMoreCommits] = useState(true);
-  const commitsPerPage = 30;
-
-  // Impact visualization state
-  const [affectedPackages, setAffectedPackages] = useState<string[]>([]);
-  const [downstreamDependents, setDownstreamDependents] = useState<string[]>([]);
-
-  // Turborepo state
+  // Tab state
   const [activeTab, setActiveTab] = useState<"files" | "turborepo" | "commits">("files");
-  const [turborepoStructure, setTurborepoStructure] =
-    useState<TurborepoStructure | null>(null);
-  const [turborepoLoading, setTurborepoLoading] = useState(false);
-  const [dependencyGraph, setDependencyGraph] = useState<DependencyEdge[]>([]);
 
-  // Fetch repository details and check for Turborepo
-  useEffect(() => {
-    async function fetchRepository() {
-      if (!owner || !repo) return;
+  // Custom hooks for state management
+  const {
+    repository,
+    turborepoStructure,
+    dependencyGraph,
+    loading: repoLoading,
+    turborepoLoading,
+    error: repoError,
+  } = useRepository({ owner, repo });
 
-      try {
-        const data = await githubService.getRepository(owner, repo);
-        setRepository(data);
+  const {
+    currentPath,
+    contents,
+    selectedFile,
+    loading: filesLoading,
+    error: filesError,
+    pathHistory,
+    handleFileClick,
+    handleBreadcrumbClick,
+  } = useFileNavigation({ owner, repo, branch });
 
-        // Check if this is a Turborepo
-        setTurborepoLoading(true);
-        try {
-          const structure = await analyzeTurborepo(owner, repo, "");
-          setTurborepoStructure(structure);
+  const {
+    commits,
+    loading: commitsLoading,
+    error: commitsError,
+    currentPage,
+    totalPages,
+    hasMore: hasMoreCommits,
+    setPage,
+    fetchCommitDetails,
+  } = useCommitHistory({
+    owner,
+    repo,
+    branch,
+    perPage: 30,
+    enabled: activeTab === "commits",
+  });
 
-          if (structure.isTurborepo) {
-            const graph = buildDependencyGraph(structure);
-            setDependencyGraph(graph);
-          }
-        } catch (err) {
-          console.error("Error analyzing Turborepo:", err);
-        } finally {
-          setTurborepoLoading(false);
-        }
-      } catch (err) {
-        console.error("Error fetching repository:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch repository",
-        );
-      }
-    }
+  const { affectedPackages, downstreamDependents, handleImpactChange } =
+    useImpactAnalysis();
 
-    fetchRepository();
-  }, [owner, repo]);
+  // Aggregate errors and loading states
+  const error = repoError || filesError || commitsError;
+  const loading = filesLoading;
 
-  // Fetch directory contents
-  useEffect(() => {
-    async function fetchContents() {
-      if (!owner || !repo) return;
 
-      try {
-        setLoading(true);
-        setError(null);
-        setSelectedFile(null);
 
-        const data = await githubService.getContents(
-          owner,
-          repo,
-          currentPath,
-          { ref: branch }
-        );
 
-        // If it's a file, show it directly
-        if (!Array.isArray(data)) {
-          // Convert FileContent to ContentItem format for handleFileClick
-          const fileItem = {
-            name: data.name,
-            path: data.path,
-            type: "file" as const,
-            size: data.size,
-            sha: data.sha,
-            url: "", // Not needed for file click
-            html_url: "", // Not needed for file click
-          };
-          handleFileClick(fileItem);
-          return;
-        }
-
-        setContents(data);
-      } catch (err) {
-        console.error("Error fetching contents:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch contents",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchContents();
-  }, [owner, repo, currentPath, branch]);
-
-  // Fetch commits
-  useEffect(() => {
-    async function fetchCommits() {
-      if (!owner || !repo || activeTab !== 'commits') return;
-
-      try {
-        setCommitsLoading(true);
-
-        const response = await githubService.getCommits(owner, repo, {
-          page: currentPage,
-          perPage: commitsPerPage,
-          sha: branch,
-        });
-
-        setCommits(response.data);
-        setHasMoreCommits(response.hasMore);
-
-        if (response.totalPages) {
-          setTotalPages(response.totalPages);
-        }
-      } catch (err) {
-        console.error('Error fetching commits:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch commits');
-      } finally {
-        setCommitsLoading(false);
-      }
-    }
-
-    fetchCommits();
-  }, [owner, repo, activeTab, currentPage, branch]);
-
-  // Fetch commit details (files changed)
-  const fetchCommitDetails = async (sha: string): Promise<CommitFile[]> => {
-    const data = await githubService.getCommit(owner, repo, sha);
-    return data.files || [];
-  };
-
-  // Handle impact change from CommitList
-  const handleImpactChange = (affected: string[], downstream: string[]) => {
-    setAffectedPackages(affected);
-    setDownstreamDependents(downstream);
-  };
-
-  const handleFileClick = async (file: ContentItem) => {
-    if (file.type === "dir") {
-      setCurrentPath(file.path);
-      setPathHistory([...pathHistory, file.path]);
-      return;
-    }
-
-    // Check if file is binary
-    if (isBinaryFile(file.name)) {
-      setSelectedFile({
-        name: file.name,
-        path: file.path,
-        content: "[Binary file - cannot display]",
-        encoding: "binary",
-        size: file.size || 0,
-        sha: file.sha,
-        type: "binary",
-      });
-      return;
-    }
-
-    // Fetch file content
-    try {
-      const data = await githubService.getContents(owner, repo, file.path, { ref: branch });
-
-      // Service already decodes base64 content
-      if (!Array.isArray(data)) {
-        setSelectedFile(data);
-      }
-    } catch (err) {
-      console.error("Error fetching file:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch file");
-    }
-  };
-
-  const handleBreadcrumbClick = (index: number) => {
-    const newPath = pathHistory[index];
-    setCurrentPath(newPath);
-    setPathHistory(pathHistory.slice(0, index + 1));
-  };
 
   if (authLoading) {
     return (
@@ -247,17 +101,7 @@ export default function RepositoryPage() {
         {!user && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
             <div className="flex items-start gap-3">
-              <svg
-                className="h-5 w-5 flex-shrink-0"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <Info className="h-5 w-5 flex-shrink-0" />
               <div>
                 <p className="font-medium">Viewing as guest</p>
                 <p className="mt-1">
@@ -318,7 +162,7 @@ export default function RepositoryPage() {
                     currentPage={currentPage}
                     totalPages={totalPages}
                     hasMoreCommits={hasMoreCommits}
-                    onPageChange={setCurrentPage}
+                    onPageChange={setPage}
                     turborepoStructure={turborepoStructure}
                     dependencyGraph={dependencyGraph}
                     onFetchCommitDetails={fetchCommitDetails}
