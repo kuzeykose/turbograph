@@ -123,56 +123,50 @@ export default function RepositoryPage() {
 
         {/* Tab content */}
         {turborepoStructure?.isTurborepo ? (
-          <div>
-            <Tabs
-              value={activeTab}
-              onValueChange={(val) =>
-                setActiveTab(val as "files" | "commits" | "turborepo")
-              }
-              className="flex flex-col gap-4"
-            >
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) =>
+              setActiveTab(val as "files" | "commits" | "turborepo")
+            }
+            className="flex flex-col gap-4"
+          >
 
-              <div>
-                <RepositoryTabBar dependencyCount={dependencyGraph.length} />
-              </div>
-              <div>
-                <TabsContent value="files">
-                  <FilesTab
-                    owner={owner}
-                    repo={repo}
-                    branch={branch}
-                    contents={contents}
-                    selectedFile={selectedFile}
-                    loading={loading}
-                    onFileClick={handleFileClick}
-                  />
-                </TabsContent>
-                <TabsContent value="commits">
-                  <CommitsTab
-                    commits={commits}
-                    commitsLoading={commitsLoading}
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    hasMoreCommits={hasMoreCommits}
-                    onPageChange={setPage}
-                    turborepoStructure={turborepoStructure}
-                    dependencyGraph={dependencyGraph}
-                    onFetchCommitDetails={fetchCommitDetails}
-                    affectedPackages={affectedPackages}
-                    downstreamDependents={downstreamDependents}
-                    onImpactChange={handleImpactChange}
-                  />
-                </TabsContent>
-                <TabsContent value="turborepo">
-                  <DependenciesTab
-                    turborepoStructure={turborepoStructure}
-                    turborepoLoading={turborepoLoading}
-                    dependencyGraph={dependencyGraph}
-                  />
-                </TabsContent>
-              </div>
-            </Tabs>
-          </div>
+            <RepositoryTabBar dependencyCount={dependencyGraph.length} />
+            <TabsContent value="files">
+              <FilesTab
+                owner={owner}
+                repo={repo}
+                branch={branch}
+                contents={contents}
+                selectedFile={selectedFile}
+                loading={loading}
+                onFileClick={handleFileClick}
+              />
+            </TabsContent>
+            <TabsContent value="commits">
+              <CommitsTab
+                commits={commits}
+                commitsLoading={commitsLoading}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                hasMoreCommits={hasMoreCommits}
+                onPageChange={setPage}
+                turborepoStructure={turborepoStructure}
+                dependencyGraph={dependencyGraph}
+                onFetchCommitDetails={fetchCommitDetails}
+                affectedPackages={affectedPackages}
+                downstreamDependents={downstreamDependents}
+                onImpactChange={handleImpactChange}
+              />
+            </TabsContent>
+            <TabsContent value="turborepo">
+              <DependenciesTab
+                turborepoStructure={turborepoStructure}
+                turborepoLoading={turborepoLoading}
+                dependencyGraph={dependencyGraph}
+              />
+            </TabsContent>
+          </Tabs>
         ) : (
           <FilesTab
             owner={owner}
