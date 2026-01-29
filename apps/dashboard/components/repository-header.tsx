@@ -1,6 +1,5 @@
 import { useAuth } from "@/contexts/auth-context";
-import { TurborepoStructure } from "@/lib/utils/turborepo";
-import { Repository } from "@/types/repository";
+import { useRepositoryContext } from "@/contexts/repository-context";
 import Link from "next/link";
 import { getLanguageColor } from "@/lib/utils/language-colors";
 import { ArrowLeft } from "@workspace/ui/icons";
@@ -13,16 +12,9 @@ import {
 } from "@workspace/ui/components/breadcrumb";
 import { BranchSelector } from "./branch-selector";
 
-export function RepositoryHeader({
-  repository,
-  turborepoStructure,
-  currentBranch,
-}: {
-  repository: Repository | null;
-  turborepoStructure: TurborepoStructure | null;
-  currentBranch?: string;
-}) {
+export function RepositoryHeader() {
   const { user } = useAuth();
+  const { repository, turborepoStructure, branch: currentBranch } = useRepositoryContext();
   const languageColor = repository?.language
     ? getLanguageColor(repository.language) || "#888"
     : "#888";
