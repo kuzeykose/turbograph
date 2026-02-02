@@ -14,7 +14,7 @@ export function DependenciesTab({
   dependencyGraph,
 }: DependenciesTabProps) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+    <div>
       {turborepoLoading ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
@@ -26,16 +26,6 @@ export function DependenciesTab({
         </div>
       ) : (
         <div>
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-              Turborepo Dependency Graph
-            </h2>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Visualizing internal workspace dependencies between apps and
-              packages
-            </p>
-          </div>
-
           {turborepoStructure.apps.length === 0 &&
           turborepoStructure.packages.length === 0 ? (
             <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800 dark:bg-zinc-800">

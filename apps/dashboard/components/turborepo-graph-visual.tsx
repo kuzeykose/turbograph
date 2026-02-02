@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  useLayoutEffect,
+} from "react";
 import {
   ZoomIn,
   ZoomOut,
@@ -79,12 +86,16 @@ export function TurborepoGraphVisual({
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [draggedNode, setDraggedNode] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 900, height: 550 });
+  const [viewBox, setViewBox] = useState({
+    x: 0,
+    y: 0,
+    width: 900,
+    height: 550,
+  });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const initialViewBoxRef = useRef({ x: 0, y: 0, width: 900, height: 550 });
 
   // Initialize viewBox based on actual SVG dimensions
   useLayoutEffect(() => {
@@ -93,17 +104,11 @@ export function TurborepoGraphVisual({
         const rect = svgRef.current.getBoundingClientRect();
         const width = rect.width || 900;
         const height = isFullscreen ? rect.height : 500;
-        const aspectRatio = 900 / 550;
-        const adjustedHeight = width / aspectRatio;
-
-        if (initialViewBoxRef.current.width === 0) {
-          initialViewBoxRef.current = { x: 0, y: 0, width: 900, height: 550 };
-        }
 
         setViewBox((prev) => ({
           ...prev,
-          width: prev.width || 900,
-          height: prev.height || 550,
+          width: width || 900,
+          height: height || 550,
         }));
       }
     };
@@ -178,7 +183,7 @@ export function TurborepoGraphVisual({
 
         const parentDeps = dependsOn.get(parent);
         const allDepsProcessed = [...(parentDeps || [])].every((dep) =>
-          nodeDepth.has(dep)
+          nodeDepth.has(dep),
         );
 
         if (allDepsProcessed && !queue.includes(parent)) {
@@ -214,7 +219,8 @@ export function TurborepoGraphVisual({
 
     nodesByDepth.forEach((nodesAtDepth, depth) => {
       const x = padding + depth * levelWidth;
-      const verticalSpacing = (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
+      const verticalSpacing =
+        (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
 
       nodesAtDepth.forEach((nodeId, index) => {
         const y = padding + verticalSpacing * (index + 0.5);
@@ -275,7 +281,10 @@ export function TurborepoGraphVisual({
           const newVy = (node.vy + fy) * damping;
 
           const fixedWidth = 900;
-          const newX = Math.max(50, Math.min(fixedWidth - 50, node.x + newVx * 0.3));
+          const newX = Math.max(
+            50,
+            Math.min(fixedWidth - 50, node.x + newVx * 0.3),
+          );
           const newY = Math.max(50, Math.min(fixedHeight - 50, node.y + newVy));
 
           return { ...node, x: newX, y: newY, vx: newVx, vy: newVy };
@@ -324,32 +333,37 @@ export function TurborepoGraphVisual({
       if (!svgRef.current) return { x: 0, y: 0 };
       const svg = svgRef.current;
       const rect = svg.getBoundingClientRect();
-      const x = ((clientX - rect.left) / rect.width) * viewBox.width + viewBox.x;
-      const y = ((clientY - rect.top) / rect.height) * viewBox.height + viewBox.y;
+      const x =
+        ((clientX - rect.left) / rect.width) * viewBox.width + viewBox.x;
+      const y =
+        ((clientY - rect.top) / rect.height) * viewBox.height + viewBox.y;
       return { x, y };
     },
-    [viewBox]
+    [viewBox],
   );
 
   // Zoom handlers
-  const handleZoom = useCallback((delta: number, centerX?: number, centerY?: number) => {
-    setViewBox((prev) => {
-      const factor = delta > 0 ? 0.9 : 1.1;
-      const newWidth = prev.width * factor;
-      const newHeight = prev.height * factor;
+  const handleZoom = useCallback(
+    (delta: number, centerX?: number, centerY?: number) => {
+      setViewBox((prev) => {
+        const factor = delta > 0 ? 0.9 : 1.1;
+        const newWidth = prev.width * factor;
+        const newHeight = prev.height * factor;
 
-      if (newWidth < 200 || newWidth > 2000) return prev;
+        if (newWidth < 200 || newWidth > 2000) return prev;
 
-      const cx = centerX ?? prev.x + prev.width / 2;
-      const cy = centerY ?? prev.y + prev.height / 2;
+        const cx = centerX ?? prev.x + prev.width / 2;
+        const cy = centerY ?? prev.y + prev.height / 2;
 
-      const newX = cx - (cx - prev.x) * factor;
-      const newY = cy - (cy - prev.y) * factor;
+        const newX = cx - (cx - prev.x) * factor;
+        const newY = cy - (cy - prev.y) * factor;
 
-      setZoom(900 / newWidth);
-      return { x: newX, y: newY, width: newWidth, height: newHeight };
-    });
-  }, []);
+        setZoom(900 / newWidth);
+        return { x: newX, y: newY, width: newWidth, height: newHeight };
+      });
+    },
+    [],
+  );
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -357,19 +371,22 @@ export function TurborepoGraphVisual({
       const point = getSvgPoint(e.clientX, e.clientY);
       handleZoom(e.deltaY, point.x, point.y);
     },
-    [getSvgPoint, handleZoom]
+    [getSvgPoint, handleZoom],
   );
 
   // Pan handlers
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (e.target === svgRef.current || (e.target as Element).classList.contains("graph-bg")) {
+      if (
+        e.target === svgRef.current ||
+        (e.target as Element).classList.contains("graph-bg")
+      ) {
         setIsPanning(true);
         setPanStart(getSvgPoint(e.clientX, e.clientY));
         setSelectedNode(null);
       }
     },
-    [getSvgPoint]
+    [getSvgPoint],
   );
 
   const handleMouseMove = useCallback(
@@ -386,13 +403,19 @@ export function TurborepoGraphVisual({
         setNodes((prev) =>
           prev.map((node) =>
             node.id === draggedNode
-              ? { ...node, x: point.x - dragOffset.x, y: point.y - dragOffset.y, fx: point.x - dragOffset.x, fy: point.y - dragOffset.y }
-              : node
-          )
+              ? {
+                  ...node,
+                  x: point.x - dragOffset.x,
+                  y: point.y - dragOffset.y,
+                  fx: point.x - dragOffset.x,
+                  fy: point.y - dragOffset.y,
+                }
+              : node,
+          ),
         );
       }
     },
-    [isPanning, panStart, getSvgPoint, draggedNode, dragOffset]
+    [isPanning, panStart, getSvgPoint, draggedNode, dragOffset],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -401,8 +424,8 @@ export function TurborepoGraphVisual({
         prevNodes.map((node) =>
           node.id === draggedNode
             ? { ...node, fx: undefined, fy: undefined }
-            : node
-        )
+            : node,
+        ),
       );
     }
     setIsPanning(false);
@@ -420,7 +443,7 @@ export function TurborepoGraphVisual({
         setDraggedNode(nodeId);
       }
     },
-    [getSvgPoint, nodes]
+    [getSvgPoint, nodes],
   );
 
   const handleNodeClick = useCallback((nodeId: string, e: React.MouseEvent) => {
@@ -457,41 +480,52 @@ export function TurborepoGraphVisual({
       setIsFullscreen(!!document.fullscreenElement);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
   const fitView = useCallback(() => {
+    if (nodes.length === 0 || !svgRef.current) return;
+
     const padding = 80;
     const nodeRadius = 36;
 
-    if (nodes.length === 0) return;
-
-    const minX = Math.min(...nodes.map((n) => n.x)) - padding - nodeRadius;
-    const maxX = Math.max(...nodes.map((n) => n.x)) + padding + nodeRadius;
-    const minY = Math.min(...nodes.map((n) => n.y)) - padding - nodeRadius;
-    const maxY = Math.max(...nodes.map((n) => n.y)) + padding + nodeRadius;
+    // Calculate bounding box of all nodes
+    const minX = Math.min(...nodes.map((n) => n.x)) - nodeRadius - padding;
+    const maxX = Math.max(...nodes.map((n) => n.x)) + nodeRadius + padding;
+    const minY = Math.min(...nodes.map((n) => n.y)) - nodeRadius - padding;
+    const maxY = Math.max(...nodes.map((n) => n.y)) + nodeRadius + padding;
 
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
 
-    const targetAspect = 900 / 550;
-    const contentAspect = contentWidth / contentHeight;
+    // Get the SVG container dimensions
+    const rect = svgRef.current.getBoundingClientRect();
+    const containerWidth = rect.width || 900;
+    const containerHeight = rect.height || 550;
 
-    let finalWidth = contentWidth;
-    let finalHeight = contentHeight;
-    let finalX = minX;
-    let finalY = minY;
+    // Calculate scale to fit content while maintaining aspect ratio
+    const scaleX = containerWidth / contentWidth;
+    const scaleY = containerHeight / contentHeight;
+    const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 100%
 
-    if (contentAspect > targetAspect) {
-      finalHeight = contentWidth / targetAspect;
-      finalY = minY - (finalHeight - contentHeight) / 2;
-    } else {
-      finalWidth = contentHeight * targetAspect;
-      finalX = minX - (finalWidth - contentWidth) / 2;
-    }
+    // Calculate the viewBox dimensions
+    const viewWidth = containerWidth / scale;
+    const viewHeight = containerHeight / scale;
 
-    setViewBox({ x: finalX, y: finalY, width: finalWidth, height: finalHeight });
-    setZoom(900 / finalWidth);
+    // Center the content
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const finalX = centerX - viewWidth / 2;
+    const finalY = centerY - viewHeight / 2;
+
+    setViewBox({
+      x: finalX,
+      y: finalY,
+      width: viewWidth,
+      height: viewHeight,
+    });
+    setZoom(scale);
   }, [nodes]);
 
   // Calculate edge path with curve
@@ -521,7 +555,7 @@ export function TurborepoGraphVisual({
 
       return `M ${sourceX} ${sourceY} Q ${midX + perpX * offset} ${midY + perpY * offset} ${targetX} ${targetY}`;
     },
-    [nodes]
+    [nodes],
   );
 
   // Keyboard shortcuts
@@ -539,17 +573,24 @@ export function TurborepoGraphVisual({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleZoom]);
 
-  const selectedNodeData = selectedNode ? nodes.find((n) => n.id === selectedNode) : null;
+  const selectedNodeData = selectedNode
+    ? nodes.find((n) => n.id === selectedNode)
+    : null;
 
   return (
-    <div ref={containerRef} className={cn(
-      "relative flex flex-col overflow-hidden rounded-xl border border-border bg-card",
-      isFullscreen && "h-screen w-screen rounded-none"
-    )}>
+    <div
+      ref={containerRef}
+      className={cn(
+        "relative flex flex-col overflow-hidden rounded-xl border border-border bg-card h-full",
+        isFullscreen && "h-screen w-screen rounded-none",
+      )}
+    >
       {/* Header with controls */}
       <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-foreground">Dependency Graph</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Dependency Graph
+          </h3>
           <span className="rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
             {nodes.length} packages
           </span>
@@ -591,7 +632,9 @@ export function TurborepoGraphVisual({
             <RotateCcw size={16} />
           </button>
           <div className="mx-2 h-4 w-px bg-border" />
-          <span className="text-xs text-muted-foreground">{Math.round(zoom * 100)}%</span>
+          <span className="text-xs text-muted-foreground">
+            {Math.round(zoom * 100)}%
+          </span>
         </div>
       </div>
 
@@ -601,9 +644,12 @@ export function TurborepoGraphVisual({
           ref={svgRef}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
           className={cn(
-            "w-full",
-            isFullscreen ? "h-full" : "h-[500px]",
-            isPanning ? "cursor-grabbing" : draggedNode ? "cursor-move" : "cursor-grab"
+            "w-full h-full",
+            isPanning
+              ? "cursor-grabbing"
+              : draggedNode
+                ? "cursor-move"
+                : "cursor-grab",
           )}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -613,14 +659,35 @@ export function TurborepoGraphVisual({
         >
           {/* Background pattern */}
           <defs>
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <pattern
+              id="grid"
+              width="40"
+              height="40"
+              patternUnits="userSpaceOnUse"
+            >
               <circle cx="1" cy="1" r="1" fill="oklch(0.25 0 0)" />
             </pattern>
             {/* Arrow markers */}
-            <marker id="arrow-dependency" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <marker
+              id="arrow-dependency"
+              viewBox="0 0 10 10"
+              refX="10"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto"
+            >
               <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.dependency} />
             </marker>
-            <marker id="arrow-devDependency" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <marker
+              id="arrow-devDependency"
+              viewBox="0 0 10 10"
+              refX="10"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto"
+            >
               <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.devDependency} />
             </marker>
             {/* Glow filter */}
@@ -634,7 +701,14 @@ export function TurborepoGraphVisual({
           </defs>
 
           {/* Grid background */}
-          <rect className="graph-bg" x={viewBox.x - 500} y={viewBox.y - 500} width={viewBox.width + 1000} height={viewBox.height + 1000} fill="url(#grid)" />
+          <rect
+            className="graph-bg"
+            x={viewBox.x - 500}
+            y={viewBox.y - 500}
+            width={viewBox.width + 1000}
+            height={viewBox.height + 1000}
+            fill="url(#grid)"
+          />
 
           {/* Edges */}
           <g className="edges">
@@ -650,7 +724,9 @@ export function TurborepoGraphVisual({
                   stroke={edgeColors[edge.type]}
                   strokeWidth={isConnected ? 2.5 : 1.5}
                   strokeOpacity={hasSelection ? (isConnected ? 1 : 0.15) : 0.6}
-                  strokeDasharray={edge.type === "devDependency" ? "6 4" : "none"}
+                  strokeDasharray={
+                    edge.type === "devDependency" ? "6 4" : "none"
+                  }
                   markerEnd={`url(#arrow-${edge.type})`}
                   className={isDragging ? "" : "transition-all duration-200"}
                 />
@@ -700,7 +776,13 @@ export function TurborepoGraphVisual({
                   />
 
                   {/* Icon */}
-                  <foreignObject x={-7} y={-18} width={14} height={14} className="pointer-events-none">
+                  <foreignObject
+                    x={-7}
+                    y={-18}
+                    width={14}
+                    height={14}
+                    className="pointer-events-none"
+                  >
                     <div className="flex h-full items-center justify-center text-foreground/90">
                       <NodeIcon type={node.type} />
                     </div>
@@ -716,7 +798,8 @@ export function TurborepoGraphVisual({
                     fontFamily="system-ui, sans-serif"
                     className="pointer-events-none select-none"
                   >
-                    {node.name.split("/").pop()?.substring(0, 12) || node.name.substring(0, 12)}
+                    {node.name.split("/").pop()?.substring(0, 12) ||
+                      node.name.substring(0, 12)}
                   </text>
 
                   {/* Stats */}
@@ -758,7 +841,9 @@ export function TurborepoGraphVisual({
                 <div className="flex items-center gap-2">
                   <div
                     className="flex h-6 w-6 items-center justify-center rounded-md"
-                    style={{ backgroundColor: nodeColors[selectedNodeData.type].fill }}
+                    style={{
+                      backgroundColor: nodeColors[selectedNodeData.type].fill,
+                    }}
                   >
                     <NodeIcon type={selectedNodeData.type} />
                   </div>
@@ -766,7 +851,9 @@ export function TurborepoGraphVisual({
                     {selectedNodeData.name.split("/").pop()}
                   </span>
                 </div>
-                <span className="mt-1 block text-xs text-muted-foreground">{selectedNodeData.name}</span>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {selectedNodeData.name}
+                </span>
               </div>
               <button
                 onClick={() => setSelectedNode(null)}
@@ -777,11 +864,17 @@ export function TurborepoGraphVisual({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-md bg-secondary p-2">
-                <div className="text-lg font-semibold text-foreground">{selectedNodeData.dependencies}</div>
-                <div className="text-xs text-muted-foreground">Dependencies</div>
+                <div className="text-lg font-semibold text-foreground">
+                  {selectedNodeData.dependencies}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Dependencies
+                </div>
               </div>
               <div className="rounded-md bg-secondary p-2">
-                <div className="text-lg font-semibold text-foreground">{selectedNodeData.dependents}</div>
+                <div className="text-lg font-semibold text-foreground">
+                  {selectedNodeData.dependents}
+                </div>
                 <div className="text-xs text-muted-foreground">Dependents</div>
               </div>
             </div>
@@ -803,7 +896,9 @@ export function TurborepoGraphVisual({
       {/* Legend */}
       <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3">
         <div className="flex items-center gap-6">
-          <span className="text-xs font-medium text-muted-foreground">Nodes</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            Nodes
+          </span>
           {(["app", "package"] as const).map((type) => (
             <div key={type} className="flex items-center gap-2">
               <div
@@ -812,18 +907,32 @@ export function TurborepoGraphVisual({
               >
                 <NodeIcon type={type} />
               </div>
-              <span className="text-xs capitalize text-muted-foreground">{type === "app" ? "Application" : "Package"}</span>
+              <span className="text-xs capitalize text-muted-foreground">
+                {type === "app" ? "Application" : "Package"}
+              </span>
             </div>
           ))}
         </div>
         <div className="flex items-center gap-6">
-          <span className="text-xs font-medium text-muted-foreground">Edges</span>
+          <span className="text-xs font-medium text-muted-foreground">
+            Edges
+          </span>
           <div className="flex items-center gap-2">
-            <div className="h-0.5 w-5 rounded-full" style={{ backgroundColor: edgeColors.dependency }} />
+            <div
+              className="h-0.5 w-5 rounded-full"
+              style={{ backgroundColor: edgeColors.dependency }}
+            />
             <span className="text-xs text-muted-foreground">Dependency</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-0.5 w-5 rounded-full" style={{ backgroundColor: edgeColors.devDependency, backgroundImage: "repeating-linear-gradient(90deg, transparent, transparent 3px, oklch(0.09 0 0) 3px, oklch(0.09 0 0) 5px)" }} />
+            <div
+              className="h-0.5 w-5 rounded-full"
+              style={{
+                backgroundColor: edgeColors.devDependency,
+                backgroundImage:
+                  "repeating-linear-gradient(90deg, transparent, transparent 3px, oklch(0.09 0 0) 3px, oklch(0.09 0 0) 5px)",
+              }}
+            />
             <span className="text-xs text-muted-foreground">Dev</span>
           </div>
         </div>
