@@ -11,6 +11,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.90.1",
     "@workspace/ui": "workspace:*",
     "date-fns": "^4.1.0",
