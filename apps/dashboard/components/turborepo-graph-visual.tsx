@@ -20,46 +20,31 @@ import {
   Boxes,
 } from "@workspace/ui/icons";
 import { cn } from "@workspace/ui/lib/utils";
-import { DependencyEdge, PackageInfo } from "@/lib/utils/turborepo";
+import {
+  type PackageInfo,
+  type DependencyEdge,
+  type GraphNode,
+  type GraphEdge,
+  calculateGraphLayout,
+  nodeColors,
+  edgeColors,
+} from "@workspace/graph";
 
-interface Node {
-  id: string;
-  name: string;
-  type: "app" | "package";
-  x: number;
-  y: number;
+// Extended node type for React state (includes velocity for force simulation)
+interface Node extends GraphNode {
   vx: number;
   vy: number;
   fx?: number;
   fy?: number;
-  dependencies: number;
-  dependents: number;
 }
 
-interface Edge {
-  id: string;
-  source: string;
-  target: string;
-  type: "dependency" | "devDependency";
-}
+type Edge = GraphEdge;
 
 interface TurborepoGraphVisualProps {
   apps: PackageInfo[];
   packages: PackageInfo[];
   dependencies: DependencyEdge[];
 }
-
-// Node colors by type
-const nodeColors = {
-  app: { fill: "oklch(0.65 0.18 265)", stroke: "oklch(0.55 0.2 265)" },
-  package: { fill: "oklch(0.7 0.16 180)", stroke: "oklch(0.6 0.18 180)" },
-};
-
-// Edge colors by type
-const edgeColors = {
-  dependency: "oklch(0.65 0.18 265)",
-  devDependency: "oklch(0.72 0.16 85)",
-};
 
 // Node type icons
 const NodeIcon = ({ type }: { type: Node["type"] }) => {
@@ -120,126 +105,23 @@ export function TurborepoGraphVisual({
 
   // Initialize nodes and edges with hierarchical layout
   useEffect(() => {
-    const width = 900;
-    const height = 550;
-    const padding = 80;
+    // Use shared layout calculation from @workspace/graph
+    const { nodes: layoutNodes, edges: layoutEdges } = calculateGraphLayout(
+      apps,
+      packages,
+      dependencies,
+      { width: 900, height: 550, padding: 80 }
+    );
 
-    // Create edges first
-    const newEdges: Edge[] = dependencies.map((dep, idx) => ({
-      id: `e${idx}`,
-      source: dep.from,
-      target: dep.to,
-      type: dep.type,
+    // Extend graph nodes with velocity properties for force simulation
+    const newNodes: Node[] = layoutNodes.map((node) => ({
+      ...node,
+      vx: 0,
+      vy: 0,
     }));
 
-    // Build adjacency list for dependency graph
-    const dependsOn = new Map<string, Set<string>>();
-    const dependedBy = new Map<string, Set<string>>();
-
-    const allNodeIds = new Set<string>();
-    apps.forEach((app) => allNodeIds.add(app.name));
-    packages.forEach((pkg) => allNodeIds.add(pkg.name));
-
-    allNodeIds.forEach((id) => {
-      dependsOn.set(id, new Set());
-      dependedBy.set(id, new Set());
-    });
-
-    dependencies.forEach((dep) => {
-      dependsOn.get(dep.from)?.add(dep.to);
-      dependedBy.get(dep.to)?.add(dep.from);
-    });
-
-    // Calculate dependency and dependent counts
-    const dependencyCount = new Map<string, number>();
-    const dependentCount = new Map<string, number>();
-    allNodeIds.forEach((id) => {
-      dependencyCount.set(id, dependsOn.get(id)?.size || 0);
-      dependentCount.set(id, dependedBy.get(id)?.size || 0);
-    });
-
-    // Calculate depth using BFS from leaf nodes
-    const nodeDepth = new Map<string, number>();
-    const queue: string[] = [];
-
-    allNodeIds.forEach((id) => {
-      if (dependsOn.get(id)?.size === 0) {
-        nodeDepth.set(id, 0);
-        queue.push(id);
-      }
-    });
-
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      const currentDepth = nodeDepth.get(current)!;
-
-      dependedBy.get(current)?.forEach((parent) => {
-        const existingDepth = nodeDepth.get(parent);
-        const newDepth = currentDepth + 1;
-
-        if (existingDepth === undefined || newDepth > existingDepth) {
-          nodeDepth.set(parent, newDepth);
-        }
-
-        const parentDeps = dependsOn.get(parent);
-        const allDepsProcessed = [...(parentDeps || [])].every((dep) =>
-          nodeDepth.has(dep),
-        );
-
-        if (allDepsProcessed && !queue.includes(parent)) {
-          queue.push(parent);
-        }
-      });
-    }
-
-    // Handle remaining nodes
-    allNodeIds.forEach((id) => {
-      if (!nodeDepth.has(id)) {
-        nodeDepth.set(id, 0);
-      }
-    });
-
-    // Group nodes by depth
-    const nodesByDepth = new Map<number, string[]>();
-    nodeDepth.forEach((depth, nodeId) => {
-      if (!nodesByDepth.has(depth)) {
-        nodesByDepth.set(depth, []);
-      }
-      nodesByDepth.get(depth)!.push(nodeId);
-    });
-
-    const maxDepth = Math.max(...nodeDepth.values(), 0);
-    const levelWidth = (width - 2 * padding) / Math.max(1, maxDepth);
-
-    // Create nodes with hierarchical positions
-    const newNodes: Node[] = [];
-    const nodeTypeMap = new Map<string, "app" | "package">();
-    apps.forEach((app) => nodeTypeMap.set(app.name, "app"));
-    packages.forEach((pkg) => nodeTypeMap.set(pkg.name, "package"));
-
-    nodesByDepth.forEach((nodesAtDepth, depth) => {
-      const x = padding + depth * levelWidth;
-      const verticalSpacing =
-        (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
-
-      nodesAtDepth.forEach((nodeId, index) => {
-        const y = padding + verticalSpacing * (index + 0.5);
-        newNodes.push({
-          id: nodeId,
-          name: nodeId,
-          type: nodeTypeMap.get(nodeId) || "package",
-          x,
-          y,
-          vx: 0,
-          vy: 0,
-          dependencies: dependencyCount.get(nodeId) || 0,
-          dependents: dependentCount.get(nodeId) || 0,
-        });
-      });
-    });
-
     setNodes(newNodes);
-    setEdges(newEdges);
+    setEdges(layoutEdges);
   }, [apps, packages, dependencies]);
 
   // Apply force simulation
@@ -404,12 +286,12 @@ export function TurborepoGraphVisual({
           prev.map((node) =>
             node.id === draggedNode
               ? {
-                  ...node,
-                  x: point.x - dragOffset.x,
-                  y: point.y - dragOffset.y,
-                  fx: point.x - dragOffset.x,
-                  fy: point.y - dragOffset.y,
-                }
+                ...node,
+                x: point.x - dragOffset.x,
+                y: point.y - dragOffset.y,
+                fx: point.x - dragOffset.x,
+                fy: point.y - dragOffset.y,
+              }
               : node,
           ),
         );
