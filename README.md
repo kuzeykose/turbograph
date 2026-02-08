@@ -154,4 +154,4 @@ Shared React component library built on shadcn/ui and Radix UI primitives, style
 
 ## License
 
-Private
+[MIT](LICENSE) -- Copyright (c) 2026 Kuzey Kose
