@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabase/client";
 import { Repository, ContentItem, FileContent } from "@/types/repository";
 import {
   GitHubRepository,
@@ -39,22 +38,28 @@ class GitHubService {
   }
 
   /**
-   * Get authentication token from constructor or Supabase session
+   * Get authentication token from constructor or gh_provider_token cookie
    */
   private async getToken(): Promise<string | undefined> {
     if (this.token) {
       return this.token;
     }
 
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      return session?.provider_token || undefined;
-    } catch (error) {
-      console.warn("Failed to get Supabase session:", error);
+    if (typeof document === "undefined") {
       return undefined;
     }
+
+    const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
+    const tokenCookie = cookies.find((cookie) =>
+      cookie.startsWith("gh_provider_token="),
+    );
+
+    if (!tokenCookie) {
+      return undefined;
+    }
+
+    const [, value] = tokenCookie.split("=");
+    return value || undefined;
   }
 
   /**
