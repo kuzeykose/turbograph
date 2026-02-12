@@ -1,11 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { Github } from '@workspace/ui/icons';
+import { useEffect, useState } from "react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
+import { Github } from "@workspace/ui/icons";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -16,7 +15,7 @@ export default function LoginPage() {
   useEffect(() => {
     // Redirect to dashboard if already logged in
     if (user) {
-      router.push('/dashboard');
+      router.push("/dashboard");
     }
   }, [user, router]);
 
@@ -25,8 +24,10 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
 
+      const supabase = createSupabaseBrowserClient();
+
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
+        provider: "github",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
@@ -37,8 +38,8 @@ export default function LoginPage() {
         setLoading(false);
       }
       // If successful, the user will be redirected to GitHub
-    } catch (err) {
-      setError('An unexpected error occurred');
+    } catch (_err) {
+      setError("An unexpected error occurred");
       setLoading(false);
     }
   };

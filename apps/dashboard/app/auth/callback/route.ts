@@ -8,10 +8,23 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const response = NextResponse.redirect(`${origin}${next}`);
+
+      const providerToken = data.session?.provider_token;
+      if (providerToken) {
+        response.cookies.set("gh_provider_token", providerToken, {
+          path: "/",
+          httpOnly: false,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 60 * 60 * 8, // 8 hours
+        });
+      }
+
+      return response;
     }
 
     console.error("Error exchanging code for session:", error.message);
