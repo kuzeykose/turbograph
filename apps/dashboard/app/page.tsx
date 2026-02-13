@@ -15,17 +15,12 @@ import {
 } from "@workspace/ui/icons";
 import { Badge } from "@workspace/ui/components/badge";
 import { Separator } from "@workspace/ui/components/separator";
+import { TurborepoGraphVisual } from "@/components/turborepo-graph-visual";
 
 import {
   type PackageInfo,
   type DependencyEdge,
-  type GraphNode,
-  type GraphEdge,
   buildDependencyGraph,
-  calculateGraphLayout,
-  nodeColors,
-  edgeColors,
-  generateEdgePath,
 } from "@workspace/graph";
 
 // ── Demo data ─────────────────────────────────────────────────────────
@@ -88,102 +83,6 @@ const demoDependencies: DependencyEdge[] = buildDependencyGraph(
   demoPackages,
   demoWorkspacePackages,
 );
-
-function getDemoLayout(
-  width: number,
-  height: number,
-  padding: number,
-): { nodes: GraphNode[]; edges: GraphEdge[] } {
-  return calculateGraphLayout(demoApps, demoPackages, demoDependencies, {
-    width,
-    height,
-    padding,
-  });
-}
-
-// ── Hero graph ────────────────────────────────────────────────────────
-
-function HeroGraph() {
-  const { nodes, edges } = getDemoLayout(560, 300, 56);
-  const nodeRadius = 24;
-
-  return (
-    <svg viewBox="0 0 560 300" className="w-full h-full">
-      <defs>
-        <radialGradient id="glow-app" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.12" />
-          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="glow-pkg" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.12" />
-          <stop offset="100%" stopColor="#14b8a6" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {/* Edges */}
-      {edges.map((edge, i) => {
-        const source = nodes.find((n) => n.id === edge.source);
-        const target = nodes.find((n) => n.id === edge.target);
-        if (!source || !target) return null;
-        const path = generateEdgePath(source, target, nodeRadius);
-
-        return (
-          <path
-            key={edge.id}
-            d={path}
-            fill="none"
-            stroke={edgeColors[edge.type]}
-            strokeWidth={1.5}
-            strokeOpacity={0.45}
-            strokeDasharray={edge.type === "devDependency" ? "6 4" : "none"}
-            className="animate-edge-draw"
-            style={{ animationDelay: `${600 + i * 80}ms` }}
-          />
-        );
-      })}
-
-      {/* Nodes */}
-      {nodes.map((node, i) => {
-        const colors = nodeColors[node.type];
-        const label =
-          node.name.split("/").pop()?.substring(0, 16) ??
-          node.name.substring(0, 16);
-        const isApp = node.type === "app";
-
-        return (
-          <g
-            key={node.id}
-            className="animate-node-appear"
-            style={{ animationDelay: `${200 + i * 100}ms` }}
-          >
-            <circle
-              cx={node.x}
-              cy={node.y}
-              r={nodeRadius * 2.5}
-              fill={isApp ? "url(#glow-app)" : "url(#glow-pkg)"}
-            />
-            <circle
-              cx={node.x}
-              cy={node.y}
-              r={nodeRadius}
-              fill={colors.fill}
-              stroke={colors.stroke}
-              strokeWidth={1.5}
-            />
-            <text
-              x={node.x}
-              y={node.y + 5}
-              textAnchor="middle"
-              className="fill-muted-foreground text-[11px] font-medium select-none"
-            >
-              {label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 // ── Static data ───────────────────────────────────────────────────────
 
@@ -394,34 +293,16 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Graph hero */}
+          {/* Graph hero -- the real interactive component */}
           <div
-            className="mt-14 max-w-2xl mx-auto animate-fade-up"
+            className="mt-14 mx-auto h-[480px] animate-fade-up"
             style={{ animationDelay: "350ms" }}
           >
-            <div className="rounded-xl border border-border bg-muted/20 p-4 sm:p-6">
-              <HeroGraph />
-
-              {/* Legend */}
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-violet-500/60" />
-                  <span>Apps</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-teal-500/60" />
-                  <span>Packages</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-8 border-t border-muted-foreground/40" />
-                  <span>Dependency</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-8 border-t border-dashed border-muted-foreground/40" />
-                  <span>Dev dependency</span>
-                </div>
-              </div>
-            </div>
+            <TurborepoGraphVisual
+              apps={demoApps}
+              packages={demoPackages}
+              dependencies={demoDependencies}
+            />
           </div>
         </div>
       </section>
@@ -445,11 +326,10 @@ export default function Home() {
                 className="group rounded-xl border border-border p-6 sm:p-8 transition-colors hover:bg-muted/30"
               >
                 <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${
-                    feature.accent === "violet"
+                  className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${feature.accent === "violet"
                       ? "bg-violet-500/10 text-violet-500"
                       : "bg-teal-500/10 text-teal-500"
-                  }`}
+                    }`}
                 >
                   <feature.icon className="w-5 h-5" />
                 </div>
