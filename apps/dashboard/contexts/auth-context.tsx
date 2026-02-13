@@ -9,12 +9,14 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshGitHubToken: (returnTo?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
+  refreshGitHubToken: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -37,6 +39,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Save provider token to cookie if available
+      // Supabase only provides provider_token during sign-in events
+      if (session?.provider_token && typeof document !== "undefined") {
+        document.cookie = `gh_provider_token=${session.provider_token}; path=/; max-age=${60 * 60 * 8}; sameSite=lax${window.location.protocol === "https:" ? "; secure" : ""}`;
+        // Clear the refresh-attempt flag on successful token retrieval
+        sessionStorage.removeItem("gh_token_refresh_attempted");
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -54,8 +64,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
+  /**
+   * Silently re-trigger the GitHub OAuth flow to get a fresh provider token.
+   * Since the user already has an active GitHub session, GitHub will redirect
+   * back immediately without prompting for credentials.
+   * A sessionStorage flag prevents infinite redirect loops.
+   */
+  const refreshGitHubToken = async (returnTo?: string) => {
+    if (typeof window === "undefined") return;
+
+    // Prevent infinite loops: if we already tried refreshing this session, don't try again
+    const refreshKey = "gh_token_refresh_attempted";
+    if (sessionStorage.getItem(refreshKey)) {
+      sessionStorage.removeItem(refreshKey);
+      // If we already tried and still failing, show a sign-out prompt as fallback
+      throw new Error("GitHub token refresh failed. Please sign out and sign in again.");
+    }
+
+    // Mark that we're attempting a refresh
+    sessionStorage.setItem(refreshKey, "true");
+
+    const supabase = createSupabaseBrowserClient();
+    const redirectPath = returnTo || window.location.pathname;
+
+    await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
+        scopes: "repo read:user",
+      },
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signOut, refreshGitHubToken }}>
       {children}
     </AuthContext.Provider>
   );

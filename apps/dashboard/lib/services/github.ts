@@ -210,11 +210,27 @@ class GitHubService {
   }
 
   /**
+   * Ensure a valid GitHub token is available
+   */
+  private async ensureAuthenticated(): Promise<void> {
+    const token = await this.getToken();
+    if (!token) {
+      throw new GitHubAPIError(
+        "GitHub authentication token is missing or expired. Please sign out and sign in again.",
+        401,
+      );
+    }
+  }
+
+  /**
    * Get user repositories
    */
   async getUserRepositories(
     options?: GetUserRepositoriesOptions,
   ): Promise<GitHubRepository[]> {
+    // This endpoint requires authentication
+    await this.ensureAuthenticated();
+
     const params = new URLSearchParams();
     if (options?.sort) params.append("sort", options.sort);
     if (options?.direction) params.append("direction", options.direction);

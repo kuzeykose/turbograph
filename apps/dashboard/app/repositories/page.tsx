@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { githubService } from "@/lib/services/github";
 import { getLanguageColor } from "@/lib/utils/language-colors";
 import Link from "next/link";
-import { GitHubRepository } from "@/types/github";
+import { GitHubRepository, GitHubAPIError } from "@/types/github";
 import { Filter, Search, ExternalLink, Star, GitFork, Archive } from "@workspace/ui/icons";
 
 interface Repository extends GitHubRepository {
@@ -14,7 +14,7 @@ interface Repository extends GitHubRepository {
 }
 
 export default function RepositoriesPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut, refreshGitHubToken } = useAuth();
   const router = useRouter();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,9 +64,25 @@ export default function RepositoriesPage() {
         setRepositories(reposWithTurboCheck);
       } catch (err) {
         console.error("Error fetching repositories:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch repositories",
-        );
+        // Check if the error is an auth error (401/403) - GitHub token expired/missing
+        if (err instanceof GitHubAPIError && (err.status === 401 || err.status === 403)) {
+          try {
+            // Automatically re-trigger OAuth to get a fresh GitHub token.
+            // The user already has an active GitHub session, so this redirect
+            // is near-instant and they'll land back on /repositories.
+            await refreshGitHubToken("/repositories");
+            return; // Page will redirect, no need to update state
+          } catch (refreshErr) {
+            // Refresh was already attempted (loop guard) — fall back to manual sign-out
+            setError(
+              "Your GitHub session has expired. Please sign out and sign back in to refresh your access.",
+            );
+          }
+        } else {
+          setError(
+            err instanceof Error ? err.message : "Failed to fetch repositories",
+          );
+        }
       } finally {
         setLoading(false);
       }
@@ -260,6 +276,14 @@ export default function RepositoriesPage() {
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
             <p className="font-semibold">Error loading repositories</p>
             <p className="mt-1">{error}</p>
+            {error.includes("sign out") && (
+              <button
+                onClick={signOut}
+                className="mt-3 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                Sign out
+              </button>
+            )}
           </div>
         )}
 
