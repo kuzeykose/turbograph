@@ -79,3 +79,52 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Landing page animations ─────────────────────────────────────── */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes nodeAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes edgeDraw {
+  from {
+    opacity: 0;
+    stroke-dashoffset: 80;
+  }
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-node-appear {
+  opacity: 0;
+  animation: nodeAppear 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-edge-draw {
+  opacity: 0;
+  animation: edgeDraw 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}

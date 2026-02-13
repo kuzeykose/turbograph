@@ -28,7 +28,7 @@ import type { PackageInfo, TurborepoStructure } from "@workspace/graph";
 export async function checkIsTurborepo(
   owner: string,
   repo: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
   try {
     return await githubService.checkFileExists(owner, repo, "turbo.json");
@@ -44,7 +44,7 @@ async function fetchPackageJson(
   owner: string,
   repo: string,
   path: string,
-  token: string
+  token: string,
 ): Promise<PackageInfo | null> {
   return await githubService.getPackageJson(owner, repo, path);
 }
@@ -56,7 +56,7 @@ async function fetchFolders(
   owner: string,
   repo: string,
   path: string,
-  token: string
+  token: string,
 ): Promise<string[]> {
   try {
     const data = await githubService.getContents(owner, repo, path);
@@ -80,7 +80,7 @@ async function fetchFolders(
 export async function analyzeTurborepo(
   owner: string,
   repo: string,
-  token: string
+  token: string,
 ): Promise<TurborepoStructure> {
   const isTurborepo = await checkIsTurborepo(owner, repo, token);
 
@@ -102,24 +102,24 @@ export async function analyzeTurborepo(
   // Fetch all package.json files
   const [apps, packages] = await Promise.all([
     Promise.all(
-      appFolders.map((folder) => fetchPackageJson(owner, repo, folder, token))
+      appFolders.map((folder) => fetchPackageJson(owner, repo, folder, token)),
     ),
     Promise.all(
       packageFolders.map((folder) =>
-        fetchPackageJson(owner, repo, folder, token)
-      )
+        fetchPackageJson(owner, repo, folder, token),
+      ),
     ),
   ]);
 
   // Filter out null results
   const validApps = apps.filter((app): app is PackageInfo => app !== null);
   const validPackages = packages.filter(
-    (pkg): pkg is PackageInfo => pkg !== null
+    (pkg): pkg is PackageInfo => pkg !== null,
   );
 
   // Create a set of workspace package names
   const workspacePackages = new Set<string>(
-    [...validApps, ...validPackages].map((pkg) => pkg.name)
+    [...validApps, ...validPackages].map((pkg) => pkg.name),
   );
 
   return {
