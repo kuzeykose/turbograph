@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
-import { ArrowLeft, LogOut } from "@workspace/ui/icons";
+import { ArrowLeft, LogOut, Settings } from "@workspace/ui/icons";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,7 +10,7 @@ import {
   BreadcrumbPage,
 } from "@workspace/ui/components/breadcrumb";
 
-export default function RepositoriesLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -22,7 +22,7 @@ export default function RepositoriesLayout({
       <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-4 min-w-0">
           <Link
-            href="/dashboard"
+            href="/"
             className="text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -30,7 +30,7 @@ export default function RepositoriesLayout({
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbPage>Repositories</BreadcrumbPage>
+                <BreadcrumbPage>Dashboard</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -40,6 +40,13 @@ export default function RepositoriesLayout({
             <span className="text-xs text-zinc-400 dark:text-zinc-500 hidden sm:inline">
               {user.email}
             </span>
+            <Link
+              href="/settings"
+              className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+              title="Settings"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </Link>
             <button
               onClick={signOut}
               className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"

@@ -24,7 +24,7 @@ export function RepositoryHeader() {
       {/* Left: Breadcrumb navigation */}
       <div className="flex items-center gap-4 min-w-0">
         <Link
-          href={user ? "/repositories" : "/"}
+          href={user ? "/dashboard" : "/"}
           className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
