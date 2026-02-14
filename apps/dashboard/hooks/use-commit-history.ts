@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { githubService } from "@/lib/services/github";
+import { queryKeys } from "@/lib/query-keys";
 
 export interface CommitFile {
   filename: string;
@@ -53,60 +55,43 @@ export function useCommitHistory({
   perPage = 30,
   enabled = true,
 }: UseCommitHistoryOptions): UseCommitHistoryReturn {
-  const [commits, setCommits] = useState<Commit[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
 
-  useEffect(() => {
-    async function fetchCommits() {
-      if (!owner || !repo || !enabled) return;
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKeys.commits.list(owner, repo, currentPage, branch),
+    queryFn: () =>
+      githubService.getCommits(owner, repo, {
+        page: currentPage,
+        perPage,
+        sha: branch,
+      }),
+    enabled: !!owner && !!repo && enabled,
+    staleTime: 1 * 60 * 1000, // 1 minute
+  });
 
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await githubService.getCommits(owner, repo, {
-          page: currentPage,
-          perPage,
-          sha: branch,
-        });
-
-        setCommits(response.data);
-        setHasMore(response.hasMore);
-
-        if (response.totalPages) {
-          setTotalPages(response.totalPages);
-        }
-      } catch (err) {
-        console.error("Error fetching commits:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch commits");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchCommits();
-  }, [owner, repo, currentPage, branch, perPage, enabled]);
-
-  const setPage = (page: number) => {
+  const setPage = useCallback((page: number) => {
     setCurrentPage(page);
-  };
+  }, []);
 
-  const fetchCommitDetails = async (sha: string): Promise<CommitFile[]> => {
-    const data = await githubService.getCommit(owner, repo, sha);
-    return data.files || [];
-  };
+  const fetchCommitDetails = useCallback(
+    async (sha: string): Promise<CommitFile[]> => {
+      const data = await githubService.getCommit(owner, repo, sha);
+      return data.files || [];
+    },
+    [owner, repo],
+  );
 
   return {
-    commits,
-    loading,
-    error,
+    commits: (data?.data as Commit[]) ?? [],
+    loading: isLoading,
+    error: error
+      ? error instanceof Error
+        ? error.message
+        : "Failed to fetch commits"
+      : null,
     currentPage,
-    totalPages,
-    hasMore,
+    totalPages: data?.totalPages ?? 1,
+    hasMore: data?.hasMore ?? true,
     setPage,
     fetchCommitDetails,
   };

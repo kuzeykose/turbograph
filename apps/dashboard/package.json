@@ -13,6 +13,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.90.1",
+    "@tanstack/react-query": "^5.90.21",
     "@workspace/graph": "workspace:*",
     "@workspace/ui": "workspace:*",
     "date-fns": "^4.1.0",

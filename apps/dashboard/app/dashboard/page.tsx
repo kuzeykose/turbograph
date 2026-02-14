@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { githubService } from "@/lib/services/github";
+import { useRepositoriesQuery } from "@/hooks/use-repositories-query";
 import { getLanguageColor } from "@/lib/utils/language-colors";
 import Link from "next/link";
-import { GitHubRepository, GitHubAPIError } from "@/types/github";
+import { GitHubAPIError } from "@/types/github";
 import {
   Search,
   ExternalLink,
@@ -17,21 +17,30 @@ import {
   ChevronRight,
 } from "@workspace/ui/icons";
 
-interface Repository extends GitHubRepository {
-  isTurborepo: boolean;
-}
-
 type FilterMode = "turborepo" | "all";
 
 export default function DashboardPage() {
   const { user, loading: authLoading, signOut, refreshGitHubToken } = useAuth();
   const router = useRouter();
-  const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [repoUrl, setRepoUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterMode>("turborepo");
+
+  const {
+    data: repositories = [],
+    isLoading: loading,
+    error: queryError,
+  } = useRepositoriesQuery(!!user && !authLoading);
+
+  // Handle auth errors
+  const error = queryError
+    ? queryError instanceof GitHubAPIError &&
+      (queryError.status === 401 || queryError.status === 403)
+      ? "Your GitHub session has expired. Please sign out and sign back in to refresh your access."
+      : queryError instanceof Error
+        ? queryError.message
+        : "Failed to fetch repositories"
+    : null;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -39,59 +48,15 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router]);
 
+  // Attempt token refresh on auth errors
   useEffect(() => {
-    async function fetchRepositories() {
-      if (!user) return;
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const repos = await githubService.getUserRepositories({
-          sort: "updated",
-          perPage: 100,
-        });
-
-        const repositoriesToCheck = repos.map((repo) => {
-          const [owner, name] = repo.full_name.split("/");
-          return { owner, name };
-        });
-
-        const turborepoResults = await githubService.batchCheckTurboJson(
-          repositoriesToCheck
-        );
-
-        const reposWithTurboCheck: Repository[] = repos.map((repo) => ({
-          ...repo,
-          isTurborepo: turborepoResults.get(repo.full_name) || false,
-        }));
-
-        setRepositories(reposWithTurboCheck);
-      } catch (err) {
-        console.error("Error fetching repositories:", err);
-        if (err instanceof GitHubAPIError && (err.status === 401 || err.status === 403)) {
-          try {
-            await refreshGitHubToken("/dashboard");
-            return;
-          } catch (refreshErr) {
-            setError(
-              "Your GitHub session has expired. Please sign out and sign back in to refresh your access.",
-            );
-          }
-        } else {
-          setError(
-            err instanceof Error ? err.message : "Failed to fetch repositories",
-          );
-        }
-      } finally {
-        setLoading(false);
-      }
+    if (
+      queryError instanceof GitHubAPIError &&
+      (queryError.status === 401 || queryError.status === 403)
+    ) {
+      refreshGitHubToken("/dashboard").catch(() => {});
     }
-
-    if (user && !authLoading) {
-      fetchRepositories();
-    }
-  }, [user, authLoading]);
+  }, [queryError, refreshGitHubToken]);
 
   const parseGitHubUrl = (
     url: string,

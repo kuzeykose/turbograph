@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { githubService } from "@/lib/services/github";
+import { queryKeys } from "@/lib/query-keys";
 import { ContentItem, FileContent } from "@/types/repository";
 import { isBinaryFile } from "@/lib/utils/format";
 
@@ -30,99 +32,84 @@ export function useFileNavigation({
   enabled = true,
 }: UseFileNavigationOptions): UseFileNavigationReturn {
   const [currentPath, setCurrentPath] = useState<string>(initialPath);
-  const [contents, setContents] = useState<ContentItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileContent | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [pathHistory, setPathHistory] = useState<string[]>([initialPath]);
 
-  // Fetch directory contents
-  useEffect(() => {
-    async function fetchContents() {
-      if (!owner || !repo || !enabled) {
-        setLoading(false);
+  const {
+    data: contentsData,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: queryKeys.contents.dir(owner, repo, currentPath, branch),
+    queryFn: async () => {
+      const data = await githubService.getContents(owner, repo, currentPath, {
+        ref: branch,
+      });
+      return data;
+    },
+    enabled: !!owner && !!repo && enabled,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Extract contents from query data (only if it's an array = directory listing)
+  const contents: ContentItem[] = Array.isArray(contentsData)
+    ? contentsData
+    : [];
+
+  const error = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : "Failed to fetch contents"
+    : null;
+
+  const handleFileClick = useCallback(
+    async (file: ContentItem) => {
+      if (file.type === "dir") {
+        setCurrentPath(file.path);
+        setPathHistory((prev) => [...prev, file.path]);
+        setSelectedFile(null);
         return;
       }
 
-      try {
-        setLoading(true);
-        setError(null);
-        setSelectedFile(null);
+      // Check if file is binary
+      if (isBinaryFile(file.name)) {
+        setSelectedFile({
+          name: file.name,
+          path: file.path,
+          content: "[Binary file - cannot display]",
+          encoding: "binary",
+          size: file.size || 0,
+          sha: file.sha,
+          type: "binary",
+        });
+        return;
+      }
 
-        const data = await githubService.getContents(owner, repo, currentPath, {
+      // Fetch file content
+      try {
+        const data = await githubService.getContents(owner, repo, file.path, {
           ref: branch,
         });
 
-        // If it's a file, show it directly
         if (!Array.isArray(data)) {
-          const fileItem = {
-            name: data.name,
-            path: data.path,
-            type: "file" as const,
-            size: data.size,
-            sha: data.sha,
-            url: "",
-            html_url: "",
-          };
-          await handleFileClick(fileItem);
-          return;
+          setSelectedFile(data);
         }
-
-        setContents(data);
       } catch (err) {
-        console.error("Error fetching contents:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch contents"
-        );
-      } finally {
-        setLoading(false);
+        console.error("Error fetching file:", err);
       }
-    }
+    },
+    [owner, repo, branch],
+  );
 
-    fetchContents();
-  }, [owner, repo, currentPath, branch, enabled]);
-
-  const handleFileClick = async (file: ContentItem) => {
-    if (file.type === "dir") {
-      setCurrentPath(file.path);
-      setPathHistory([...pathHistory, file.path]);
-      return;
-    }
-
-    // Check if file is binary
-    if (isBinaryFile(file.name)) {
-      setSelectedFile({
-        name: file.name,
-        path: file.path,
-        content: "[Binary file - cannot display]",
-        encoding: "binary",
-        size: file.size || 0,
-        sha: file.sha,
-        type: "binary",
-      });
-      return;
-    }
-
-    // Fetch file content
-    try {
-      const data = await githubService.getContents(owner, repo, file.path, {
-        ref: branch,
-      });
-
-      if (!Array.isArray(data)) {
-        setSelectedFile(data);
-      }
-    } catch (err) {
-      console.error("Error fetching file:", err);
-      setError(err instanceof Error ? err.message : "Failed to fetch file");
-    }
-  };
-
-  const handleBreadcrumbClick = (index: number) => {
-    const newPath = pathHistory[index];
-    setCurrentPath(newPath);
-    setPathHistory(pathHistory.slice(0, index + 1));
-  };
+  const handleBreadcrumbClick = useCallback(
+    (index: number) => {
+      const newPath = pathHistory[index];
+      setCurrentPath(newPath);
+      setPathHistory(pathHistory.slice(0, index + 1));
+      setSelectedFile(null);
+    },
+    [pathHistory],
+  );
 
   return {
     currentPath,

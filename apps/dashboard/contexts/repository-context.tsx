@@ -8,13 +8,11 @@ import {
   useCallback,
 } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { githubService } from "@/lib/services/github";
 import {
-  analyzeTurborepo,
-  buildDependencyGraph,
-  TurborepoStructure,
-  DependencyEdge,
-} from "@/lib/utils/turborepo";
+  useRepositoryQuery,
+  useTurborepoAnalysisQuery,
+} from "@/hooks/use-repository-query";
+import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { Repository } from "@/types/repository";
 
 type TabValue = "files" | "commits" | "turborepo";
@@ -64,14 +62,21 @@ export function RepositoryProvider({
       : "files"
   );
 
-  // Repository state
-  const [repository, setRepository] = useState<Repository | null>(null);
-  const [turborepoStructure, setTurborepoStructure] =
-    useState<TurborepoStructure | null>(null);
-  const [dependencyGraph, setDependencyGraph] = useState<DependencyEdge[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [turborepoLoading, setTurborepoLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Repository data via TanStack Query
+  const {
+    data: repository = null,
+    isLoading: loading,
+    error: repoError,
+  } = useRepositoryQuery(owner, repo);
+
+  const {
+    data: turborepoData,
+    isLoading: turborepoLoading,
+  } = useTurborepoAnalysisQuery(owner, repo);
+
+  const turborepoStructure = turborepoData?.structure ?? null;
+  const dependencyGraph = turborepoData?.dependencyGraph ?? [];
+  const error = repoError ? (repoError instanceof Error ? repoError.message : "Failed to fetch repository") : null;
 
   // Tab setter that syncs with URL
   const setActiveTab = useCallback(
@@ -105,49 +110,6 @@ export function RepositoryProvider({
         : "files";
     setActiveTabState(newTab);
   }, [searchParams]);
-
-  // Fetch repository data
-  useEffect(() => {
-    async function fetchRepository() {
-      if (!owner || !repo) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        const data = await githubService.getRepository(owner, repo);
-        setRepository(data);
-
-        // Check if this is a Turborepo
-        setTurborepoLoading(true);
-        try {
-          const structure = await analyzeTurborepo(owner, repo, "");
-          setTurborepoStructure(structure);
-
-          if (structure.isTurborepo) {
-            const graph = buildDependencyGraph(structure);
-            setDependencyGraph(graph);
-          }
-        } catch (err) {
-          console.error("Error analyzing Turborepo:", err);
-        } finally {
-          setTurborepoLoading(false);
-        }
-      } catch (err) {
-        console.error("Error fetching repository:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch repository"
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchRepository();
-  }, [owner, repo]);
 
   return (
     <RepositoryContext.Provider
