@@ -35,5 +35,12 @@
     "dependency-graph",
     "cli"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "author": "Kuzey Kose",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kuzeykose/turbograph",
+    "directory": "apps/cli"
+  },
+  "homepage": "https://github.com/kuzeykose/turbograph/tree/main/apps/cli"
 }
