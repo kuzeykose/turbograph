@@ -14,7 +14,7 @@ import { analyzeTurborepo, checkIsTurborepo } from "./analyzer.js";
 const program = new Command();
 
 program
-  .name("turbograph")
+  .name("trbgraph")
   .description("Generate dependency graphs for Turborepo workspaces")
   .version("0.0.1");
 

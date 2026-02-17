@@ -1,4 +1,4 @@
-# turbograph
+# trbgraph
 
 CLI tool that generates SVG dependency graphs for Turborepo workspaces.
 
@@ -7,7 +7,7 @@ CLI tool that generates SVG dependency graphs for Turborepo workspaces.
 Run from the root of any Turborepo project:
 
 ```bash
-npx turbograph
+npx trbgraph
 ```
 
 This scans the workspace, resolves internal dependencies, and outputs a `graph.svg` file in the current directory.
@@ -29,19 +29,19 @@ This scans the workspace, resolves internal dependencies, and outputs a `graph.s
 Generate with default settings:
 
 ```bash
-npx turbograph
+npx trbgraph
 ```
 
 Custom output file and dimensions:
 
 ```bash
-npx turbograph -o deps.svg -w 1200 -h 800
+npx trbgraph -o deps.svg -w 1200 -h 800
 ```
 
 Point to a different directory:
 
 ```bash
-npx turbograph -d ../my-monorepo
+npx trbgraph -d ../my-monorepo
 ```
 
 ## How it works

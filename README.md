@@ -5,7 +5,7 @@ Analyze and visualize dependency graphs for Turborepo workspaces. Available as a
 ## Features
 
 - **Dependency graph visualization** -- hierarchical SVG graphs showing internal package relationships
-- **CLI tool** -- run `npx turbograph` in any Turborepo project to generate an SVG
+- **CLI tool** -- run `npx trbgraph` in any Turborepo project to generate an SVG
 - **Web dashboard** -- browse GitHub repos, view code, explore commits, and visualize Turborepo dependencies interactively
 - **Impact analysis** -- see which packages are affected by changes in a given package
 - **Apps vs. packages** -- color-coded nodes distinguish apps from packages at a glance
@@ -56,7 +56,7 @@ pnpm format
 Generate an SVG dependency graph from any Turborepo workspace:
 
 ```bash
-npx turbograph
+npx trbgraph
 ```
 
 ### Options
@@ -73,13 +73,13 @@ npx turbograph
 
 ```bash
 # Default settings
-npx turbograph
+npx trbgraph
 
 # Custom output and dimensions
-npx turbograph -o deps.svg -w 1200 -h 800
+npx trbgraph -o deps.svg -w 1200 -h 800
 
 # Point to a different directory
-npx turbograph -d ../my-monorepo
+npx trbgraph -d ../my-monorepo
 ```
 
 ### How it works

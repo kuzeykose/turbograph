@@ -27,7 +27,7 @@ import {
 
 const demoApps: PackageInfo[] = [
   {
-    name: "turbograph",
+    name: "trbgraph",
     path: "apps/cli",
     dependencies: { "@workspace/graph": "workspace:*" },
     devDependencies: {},
@@ -360,7 +360,7 @@ export default function Home() {
               <p className="mt-4 text-muted-foreground leading-relaxed">
                 Run{" "}
                 <code className="font-mono text-foreground text-sm bg-muted px-1.5 py-0.5 rounded">
-                  npx turbograph
+                  npx trbgraph
                 </code>{" "}
                 against any Turborepo to generate an SVG dependency graph
                 instantly. No config required.
@@ -381,7 +381,7 @@ export default function Home() {
 
                 <div className="p-5 font-mono text-[13px] leading-relaxed space-y-1 text-muted-foreground">
                   <p>
-                    <span className="text-teal-500">$</span> npx turbograph
+                    <span className="text-teal-500">$</span> npx trbgraph
                     vercel/turbo --svg
                   </p>
                   <p className="text-foreground/30">
@@ -398,7 +398,7 @@ export default function Home() {
                   </p>
                   <div className="h-2" />
                   <p>
-                    <span className="text-teal-500">$</span> npx turbograph
+                    <span className="text-teal-500">$</span> npx trbgraph
                     vercel/turbo --json
                   </p>
                   <p className="text-foreground/30">
