@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ThemeProvider } from "@/contexts/theme-provider";
@@ -39,6 +40,7 @@ export default function RootLayout({
             <ThemeToggle />
           </div>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
