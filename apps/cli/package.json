@@ -4,7 +4,7 @@
   "description": "CLI tool to generate dependency graphs for Turborepo workspaces",
   "type": "module",
   "bin": {
-    "trbgraph": "./dist/index.js"
+    "trbgraph": "dist/index.js"
   },
   "scripts": {
     "build": "tsup",
@@ -13,7 +13,6 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@workspace/graph": "workspace:*",
     "chalk": "^5.3.0",
     "commander": "^12.1.0",
     "glob": "^11.0.0",
@@ -21,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.9",
+    "@workspace/graph": "workspace:*",
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "tsup": "^8.0.0",
@@ -39,7 +39,7 @@
   "author": "Kuzey Kose",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kuzeykose/turbograph",
+    "url": "git+https://github.com/kuzeykose/turbograph.git",
     "directory": "apps/cli"
   },
   "homepage": "https://github.com/kuzeykose/turbograph/tree/main/apps/cli"
