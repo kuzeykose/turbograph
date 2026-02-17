@@ -26,9 +26,6 @@ importers:
 
   apps/cli:
     dependencies:
-      '@workspace/graph':
-        specifier: workspace:*
-        version: link:../../packages/graph
       chalk:
         specifier: ^5.3.0
         version: 5.6.2
@@ -48,6 +45,9 @@ importers:
       '@workspace/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@workspace/graph':
+        specifier: workspace:*
+        version: link:../../packages/graph
       '@workspace/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
