@@ -12,7 +12,6 @@ import {
   GitBranch,
 } from "@workspace/ui/icons";
 import { Header } from "@/components/header";
-import { Badge } from "@workspace/ui/components/badge";
 import { Separator } from "@workspace/ui/components/separator";
 import { TurborepoGraphVisual } from "@/components/turborepo-graph-visual";
 
@@ -229,14 +228,9 @@ export default function Home() {
         <div className="relative mx-auto max-w-5xl px-6 pt-24 pb-16 sm:pt-32 sm:pb-20">
           {/* Centered text */}
           <div className="max-w-2xl mx-auto text-center animate-fade-up">
-            <Badge variant="outline" className="mb-6 inline-flex">
-              <Github className="w-3.5 h-3.5" />
-              Open Source
-            </Badge>
-
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-foreground leading-[1.08]">
               Visualize your{" "}
-              <span className="bg-gradient-to-r from-violet-500 to-teal-400 bg-clip-text text-transparent">
+              <span className="animate-gradient-text bg-[length:200%_auto] bg-gradient-to-r from-violet-500 via-teal-400 to-violet-500 bg-clip-text text-transparent">
                 Turborepo
               </span>{" "}
               workspace
