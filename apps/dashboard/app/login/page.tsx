@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -13,7 +13,6 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to dashboard if already logged in
     if (user) {
       router.push("/dashboard");
     }
@@ -38,7 +37,6 @@ export default function LoginPage() {
         setError(error.message);
         setLoading(false);
       }
-      // If successful, the user will be redirected to GitHub
     } catch (_err) {
       setError("An unexpected error occurred");
       setLoading(false);
@@ -46,20 +44,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-      <div className="w-full max-w-md space-y-8 px-4">
+    <main className="flex flex-1 items-center justify-center overflow-auto">
+      <div className="w-full max-w-sm px-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
             Welcome
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-1 text-base text-zinc-400 dark:text-zinc-500">
             Sign in to your account to continue
           </p>
         </div>
 
-        <div className="mt-8 space-y-4">
+        <div className="mt-6 space-y-3">
           {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
               {error}
             </div>
           )}
@@ -67,26 +65,26 @@ export default function LoginPage() {
           <button
             onClick={handleGitHubSignIn}
             disabled={loading}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-900 transition-colors hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-700"
           >
             {loading ? (
               <>
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-solid border-current border-r-transparent" />
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-zinc-100" />
                 <span>Connecting...</span>
               </>
             ) : (
               <>
-                <Github className="h-5 w-5" />
+                <Github className="h-4 w-4" />
                 <span>Sign in with GitHub</span>
               </>
             )}
           </button>
         </div>
 
-        <p className="text-center text-xs text-zinc-500 dark:text-zinc-500">
+        <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
           By signing in, you agree to our Terms of Service and Privacy Policy
         </p>
       </div>
-    </div>
+    </main>
   );
 }
