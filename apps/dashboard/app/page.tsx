@@ -1,7 +1,5 @@
 'use client';
 
-import Link from "next/link";
-import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -13,6 +11,7 @@ import {
   Terminal,
   GitBranch,
 } from "@workspace/ui/icons";
+import { Header } from "@/components/header";
 import { Badge } from "@workspace/ui/components/badge";
 import { Separator } from "@workspace/ui/components/separator";
 import { TurborepoGraphVisual } from "@/components/turborepo-graph-visual";
@@ -141,7 +140,6 @@ const steps = [
 // ── Page ──────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const { user, loading } = useAuth();
   const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -215,6 +213,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       {/* ── Hero ──────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         {/* Grid background */}
@@ -256,39 +255,10 @@ export default function Home() {
               {searchForm}
             </div>
 
-            {/* Auth / helper */}
-            <div
-              className="mt-5 flex items-center justify-center gap-4 text-sm animate-fade-up"
+            <p
+              className="mt-5 text-xs text-muted-foreground/60 animate-fade-up"
               style={{ animationDelay: "250ms" }}
             >
-              {loading ? (
-                <span className="text-muted-foreground">Loading...</span>
-              ) : user ? (
-                <>
-                  <span className="text-muted-foreground">
-                    Signed in as{" "}
-                    {user.user_metadata?.name || user.email}
-                  </span>
-                  <Link
-                    href="/dashboard"
-                    className="inline-flex items-center gap-1.5 text-foreground font-medium hover:underline underline-offset-4"
-                  >
-                    Dashboard
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </>
-              ) : (
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Sign in with GitHub for private repos
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              )}
-            </div>
-
-            <p className="mt-2 text-xs text-muted-foreground/60">
               Try: vercel/turbo, calcom/cal.com, or any public Turborepo
             </p>
           </div>
