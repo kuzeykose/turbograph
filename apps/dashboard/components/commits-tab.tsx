@@ -1,3 +1,6 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
 import { CommitList, Commit, CommitFile } from "@/components/commit-list";
 import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { BarChart3 } from "@workspace/ui/icons";
@@ -73,10 +76,40 @@ export function CommitsTab({
     downstreamDependents,
   );
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [leftWidth, setLeftWidth] = useState(42);
+  const isDragging = useRef(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDragging.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = moveEvent.clientX - rect.left;
+      const pct = (x / rect.width) * 100;
+      setLeftWidth(Math.min(Math.max(pct, 20), 80));
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
+
   return (
-    <div className="flex-1 min-h-0 grid grid-rows-1 gap-6 lg:grid-cols-12">
-      {/* Commit List - Left Column */}
-      <div className="lg:col-span-5 min-h-0 overflow-y-auto">
+    <div ref={containerRef} className="flex-1 min-h-0 flex flex-row">
+      {/* Commit List - Left Panel */}
+      <div className="min-h-0 overflow-y-auto" style={{ width: `${leftWidth}%` }}>
         <CommitList
           commits={commits}
           loading={commitsLoading}
@@ -91,8 +124,22 @@ export function CommitsTab({
         />
       </div>
 
-      {/* Dependency Graph - Right Column */}
-      <div className="lg:col-span-7 min-h-0 flex flex-col">
+      {/* Resize Handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="group relative flex-shrink-0 w-1.5 cursor-col-resize select-none flex items-center justify-center"
+      >
+        <div className="absolute inset-y-0 -left-1 -right-1 z-10" />
+        <div className="h-full w-px bg-zinc-200 transition-colors group-hover:bg-zinc-400 dark:bg-zinc-800 dark:group-hover:bg-zinc-600" />
+        <div className="absolute top-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500" />
+          <div className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500" />
+          <div className="h-1 w-1 rounded-full bg-zinc-400 dark:bg-zinc-500" />
+        </div>
+      </div>
+
+      {/* Dependency Graph - Right Panel */}
+      <div className="min-h-0 flex flex-col" style={{ width: `${100 - leftWidth}%` }}>
         {turborepoStructure?.isTurborepo ? (
           <div className="flex-1 min-h-0 flex flex-col rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between mb-3">
