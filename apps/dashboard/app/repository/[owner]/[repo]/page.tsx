@@ -73,8 +73,8 @@ export default function RepositoryPage() {
       <RepositorySidebar />
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-full px-4 py-6">
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="w-full max-w-full flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Info banner for unauthenticated users */}
           {!user && (
             <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">

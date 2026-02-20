@@ -263,6 +263,7 @@ export default function Home() {
             style={{ animationDelay: "350ms" }}
           >
             <TurborepoGraphVisual
+              className="rounded-xl border border-border bg-card h-full"
               apps={demoApps}
               packages={demoPackages}
               dependencies={demoDependencies}
@@ -291,8 +292,8 @@ export default function Home() {
               >
                 <div
                   className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${feature.accent === "violet"
-                      ? "bg-violet-500/10 text-violet-500"
-                      : "bg-teal-500/10 text-teal-500"
+                    ? "bg-violet-500/10 text-violet-500"
+                    : "bg-teal-500/10 text-teal-500"
                     }`}
                 >
                   <feature.icon className="w-5 h-5" />

@@ -1,7 +1,7 @@
-import { TurborepoGraph } from "@/components/turborepo-graph";
 import { CommitList, Commit, CommitFile } from "@/components/commit-list";
 import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { BarChart3 } from "@workspace/ui/icons";
+import { TurborepoGraphVisual } from "./turborepo-graph-visual";
 
 interface CommitsTabProps {
   commits: Commit[];
@@ -74,9 +74,9 @@ export function CommitsTab({
   );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
+    <div className="flex-1 min-h-0 grid grid-rows-1 gap-6 lg:grid-cols-12">
       {/* Commit List - Left Column */}
-      <div className="lg:col-span-5">
+      <div className="lg:col-span-5 min-h-0 overflow-y-auto">
         <CommitList
           commits={commits}
           loading={commitsLoading}
@@ -92,69 +92,70 @@ export function CommitsTab({
       </div>
 
       {/* Dependency Graph - Right Column */}
-      <div className="lg:col-span-7">
-        <div className="sticky top-6">
-          {turborepoStructure?.isTurborepo ? (
-            <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {affectedPackages.length > 0 ? "Impact" : "Dependencies"}
-                </h3>
-                {affectedPackages.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="px-1.5 py-0.5 text-[10px] rounded bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400 font-medium">
-                      {affectedPackages.length} affected
+      <div className="lg:col-span-7 min-h-0 flex flex-col">
+        {turborepoStructure?.isTurborepo ? (
+          <div className="flex-1 min-h-0 flex flex-col rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                {affectedPackages.length > 0 ? "Impact" : "Dependencies"}
+              </h3>
+              {affectedPackages.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400 font-medium">
+                    {affectedPackages.length} affected
+                  </span>
+                  {downstreamDependents.length > 0 && (
+                    <span className="px-1.5 py-0.5 text-[10px] rounded bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 font-medium">
+                      {downstreamDependents.length} downstream
                     </span>
-                    {downstreamDependents.length > 0 && (
-                      <span className="px-1.5 py-0.5 text-[10px] rounded bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400 font-medium">
-                        {downstreamDependents.length} downstream
-                      </span>
-                    )}
+                  )}
+                </div>
+              )}
+            </div>
+            {affectedPackages.length > 0 ? (
+              <div className="mb-4">
+                <div className="flex gap-3 text-[11px]">
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 w-2 rounded-full bg-violet-500" />
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Affected
+                    </span>
                   </div>
-                )}
-              </div>
-              {affectedPackages.length > 0 ? (
-                <div className="mb-4">
-                  <div className="flex gap-3 text-[11px]">
-                    <div className="flex items-center gap-1">
-                      <div className="h-2 w-2 rounded-full bg-violet-500" />
-                      <span className="text-zinc-500 dark:text-zinc-400">
-                        Affected
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="h-2 w-2 rounded-full bg-amber-500" />
-                      <span className="text-zinc-500 dark:text-zinc-400">
-                        Downstream
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Downstream
+                    </span>
                   </div>
                 </div>
-              ) : (
-                <p className="mb-4 text-xs text-zinc-400 dark:text-zinc-500">
-                  Expand a commit to see its impact
-                </p>
-              )}
-              <TurborepoGraph
+              </div>
+            ) : (
+              <p className="mb-4 text-xs text-zinc-400 dark:text-zinc-500">
+                Expand a commit to see its impact
+              </p>
+            )}
+            <div className="flex-1 min-h-0">
+              <TurborepoGraphVisual
+                className="rounded-xl border border-border bg-card h-full"
                 apps={filteredData.apps}
                 packages={filteredData.packages}
                 dependencies={filteredData.dependencies}
               />
             </div>
-          ) : (
-            <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-              <div className="text-center">
-                <BarChart3 className="mx-auto h-8 w-8 text-zinc-300 dark:text-zinc-600" />
-                <h3 className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  Not a Turborepo
-                </h3>
-                <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                  Dependency graph is available for Turborepo monorepos
-                </p>
-              </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="text-center">
+              <BarChart3 className="mx-auto h-8 w-8 text-zinc-300 dark:text-zinc-600" />
+              <h3 className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                Not a Turborepo
+              </h3>
+              <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                Dependency graph is available for Turborepo monorepos
+              </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

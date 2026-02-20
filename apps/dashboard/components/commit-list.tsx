@@ -159,8 +159,8 @@ export function CommitList({
     const hasNext = hasMore || currentPage < totalPages;
 
     return (
-        <div className="space-y-0">
-            <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="h-full flex flex-col">
+            <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                     {commits.map((commit) => {
                         const isExpanded = expandedCommits.has(commit.sha);
@@ -327,7 +327,7 @@ export function CommitList({
 
             {/* Pagination Controls */}
             {onPageChange && (hasPrevious || hasNext) && (
-                <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/50 px-4 py-2">
+                <div className="flex-shrink-0 flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800/50 px-4 py-2">
                     <button
                         onClick={() => onPageChange(currentPage - 1)}
                         disabled={!hasPrevious}

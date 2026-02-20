@@ -44,6 +44,7 @@ interface TurborepoGraphVisualProps {
   apps: PackageInfo[];
   packages: PackageInfo[];
   dependencies: DependencyEdge[];
+  className?: string;
 }
 
 // Node type icons
@@ -61,6 +62,7 @@ export function TurborepoGraphVisual({
   apps,
   packages,
   dependencies,
+  className,
 }: TurborepoGraphVisualProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -333,13 +335,6 @@ export function TurborepoGraphVisual({
     setSelectedNode((prev) => (prev === nodeId ? null : nodeId));
   }, []);
 
-  // Control functions
-  const resetView = useCallback(() => {
-    setViewBox({ x: 0, y: 0, width: 900, height: 550 });
-    setZoom(1);
-    setSelectedNode(null);
-  }, []);
-
   const toggleFullscreen = useCallback(async () => {
     if (!containerRef.current) return;
 
@@ -410,6 +405,14 @@ export function TurborepoGraphVisual({
     setZoom(scale);
   }, [nodes]);
 
+  const hasFittedRef = useRef(false);
+  useEffect(() => {
+    if (nodes.length > 0 && !hasFittedRef.current) {
+      hasFittedRef.current = true;
+      fitView();
+    }
+  }, [nodes, fitView]);
+
   // Calculate edge path with curve
   const getEdgePath = useCallback(
     (edge: Edge) => {
@@ -463,12 +466,13 @@ export function TurborepoGraphVisual({
     <div
       ref={containerRef}
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-xl border border-border bg-card h-full",
+        "relative flex flex-col overflow-hidden h-full",
+        className,
         isFullscreen && "h-screen w-screen rounded-none",
       )}
     >
       {/* Header with controls */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-semibold text-foreground">
             Dependency Graph
@@ -497,7 +501,7 @@ export function TurborepoGraphVisual({
             className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             title="Fit View"
           >
-            <Maximize2 size={16} />
+            <RotateCcw size={16} />
           </button>
           <button
             onClick={toggleFullscreen}
@@ -505,13 +509,6 @@ export function TurborepoGraphVisual({
             title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
-          <button
-            onClick={resetView}
-            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            title="Reset View"
-          >
-            <RotateCcw size={16} />
           </button>
           <div className="mx-2 h-4 w-px bg-border" />
           <span className="text-xs text-muted-foreground">
