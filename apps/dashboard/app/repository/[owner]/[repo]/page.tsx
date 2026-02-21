@@ -8,6 +8,7 @@ import { RepositorySidebar } from "@/components/repository-sidebar";
 import { FilesTab } from "@/components/files-tab";
 import { CommitsTab } from "@/components/commits-tab";
 import { DependenciesTab } from "@/components/dependencies-tab";
+import { PackagesTab } from "@/components/packages-tab";
 import { useFileNavigation } from "@/hooks/use-file-navigation";
 import { useCommitHistory } from "@/hooks/use-commit-history";
 import { useImpactAnalysis } from "@/hooks/use-impact-analysis";
@@ -137,6 +138,14 @@ export default function RepositoryPage() {
 
           {activeTab === "turborepo" && turborepoStructure?.isTurborepo && (
             <DependenciesTab
+              turborepoStructure={turborepoStructure}
+              turborepoLoading={turborepoLoading}
+              dependencyGraph={dependencyGraph}
+            />
+          )}
+
+          {activeTab === "packages" && turborepoStructure?.isTurborepo && (
+            <PackagesTab
               turborepoStructure={turborepoStructure}
               turborepoLoading={turborepoLoading}
               dependencyGraph={dependencyGraph}
