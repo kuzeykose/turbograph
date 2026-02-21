@@ -518,12 +518,12 @@ export function TurborepoGraphVisual({
       </div>
 
       {/* Graph canvas */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-h-0">
         <svg
           ref={svgRef}
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
           className={cn(
-            "w-full h-full",
+            "absolute inset-0 w-full h-full",
             isPanning
               ? "cursor-grabbing"
               : draggedNode

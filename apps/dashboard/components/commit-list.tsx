@@ -55,23 +55,18 @@ export function CommitList({
     onFetchCommitDetails,
     onImpactChange
 }: CommitListProps) {
-    const [expandedCommits, setExpandedCommits] = useState<Set<string>>(new Set());
+    const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
     const [commitFiles, setCommitFiles] = useState<Map<string, CommitFile[]>>(new Map());
     const [loadingCommits, setLoadingCommits] = useState<Set<string>>(new Set());
 
     const toggleCommit = async (sha: string) => {
-        const newExpanded = new Set(expandedCommits);
-
-        if (newExpanded.has(sha)) {
-            newExpanded.delete(sha);
-            setExpandedCommits(newExpanded);
-            // Clear impact when collapsing
+        if (expandedCommit === sha) {
+            setExpandedCommit(null);
             if (onImpactChange) {
                 onImpactChange([], []);
             }
         } else {
-            newExpanded.add(sha);
-            setExpandedCommits(newExpanded);
+            setExpandedCommit(sha);
 
             // Fetch commit details if not already fetched
             if (!commitFiles.has(sha) && onFetchCommitDetails) {
@@ -157,13 +152,14 @@ export function CommitList({
 
     const hasPrevious = currentPage > 1;
     const hasNext = hasMore || currentPage < totalPages;
+    const displayTotalPages = Math.max(totalPages, currentPage);
 
     return (
         <div className="h-full flex flex-col">
-            <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:border-zinc-800 dark:bg-zinc-900">
                 <div className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                     {commits.map((commit) => {
-                        const isExpanded = expandedCommits.has(commit.sha);
+                        const isExpanded = expandedCommit === commit.sha;
                         const files = commitFiles.get(commit.sha) || [];
                         const isLoadingDetails = loadingCommits.has(commit.sha);
 
@@ -199,15 +195,15 @@ export function CommitList({
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                    <ChevronRight
-                                                        className={`h-3.5 w-3.5 flex-shrink-0 text-zinc-400 dark:text-zinc-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                                                    />
-                                                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50 truncate">
-                                                        {commit.commit.message.split('\n')[0]}
-                                                    </span>
-                                                </div>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <ChevronRight
+                                                    className={`h-3.5 w-3.5 flex-shrink-0 text-zinc-400 dark:text-zinc-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                                />
+                                                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50 truncate">
+                                                    {commit.commit.message.split('\n')[0]}
+                                                </span>
+                                            </div>
                                             <div className="flex-shrink-0 flex items-center gap-2">
                                                 <span className="hidden sm:inline font-mono text-[11px] text-zinc-400">
                                                     {commit.sha.substring(0, 7)}
@@ -338,7 +334,7 @@ export function CommitList({
                     </button>
 
                     <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                        {currentPage} / {totalPages}
+                        {currentPage} / {displayTotalPages}
                     </span>
 
                     <button

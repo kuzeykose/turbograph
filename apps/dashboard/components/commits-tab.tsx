@@ -77,7 +77,7 @@ export function CommitsTab({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [leftWidth, setLeftWidth] = useState(42);
+  const [leftWidth, setLeftWidth] = useState(30);
   const isDragging = useRef(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -107,7 +107,7 @@ export function CommitsTab({
   }, []);
 
   return (
-    <div ref={containerRef} className="flex-1 min-h-0 flex flex-row">
+    <div ref={containerRef} className="flex-1 min-h-0 flex flex-row gap-1">
       {/* Commit List - Left Panel */}
       <div className="min-h-0 overflow-y-auto" style={{ width: `${leftWidth}%` }}>
         <CommitList
@@ -139,9 +139,9 @@ export function CommitsTab({
       </div>
 
       {/* Dependency Graph - Right Panel */}
-      <div className="min-h-0 flex flex-col" style={{ width: `${100 - leftWidth}%` }}>
+      <div className="min-h-0 flex flex-col overflow-hidden" style={{ width: `${100 - leftWidth}%` }}>
         {turborepoStructure?.isTurborepo ? (
-          <div className="flex-1 min-h-0 flex flex-col rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
                 {affectedPackages.length > 0 ? "Impact" : "Dependencies"}

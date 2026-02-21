@@ -107,7 +107,7 @@ class GitHubService {
       return { hasMore: false };
     }
 
-    const lastPageMatch = linkHeader.match(/page=(\d+)>; rel="last"/);
+    const lastPageMatch = linkHeader.match(/[?&]page=(\d+)[^>]*>;\s*rel="last"/);
     const hasNext = linkHeader.includes('rel="next"');
 
     return {
