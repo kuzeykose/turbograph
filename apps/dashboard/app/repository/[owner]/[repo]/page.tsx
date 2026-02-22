@@ -114,7 +114,7 @@ export default function RepositoryPage() {
         <div className="w-full max-w-full flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Info banner for unauthenticated users */}
           {!user && (
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+            <div className="m-4 mb-2 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-200">
               <div className="flex items-start gap-3">
                 <Info className="h-5 w-5 flex-shrink-0" />
                 <div>
