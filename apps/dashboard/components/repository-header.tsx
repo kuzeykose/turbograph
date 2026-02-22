@@ -32,7 +32,7 @@ export function RepositoryHeader() {
         </Link>
 
 
-        {repository && (
+        {repository ? (
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -59,12 +59,20 @@ export function RepositoryHeader() {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-20 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+            <span className="text-zinc-300 dark:text-zinc-600">/</span>
+            <div className="h-4 w-28 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+            <span className="text-zinc-300 dark:text-zinc-600">/</span>
+            <div className="h-6 w-24 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+          </div>
         )}
       </div>
 
       {/* Right: Stats + Avatar */}
       <div className="flex items-center gap-3">
-        {repository && (
+        {repository ? (
           <>
             {repository.language && (
               <span className="flex items-center gap-1.5 text-sm text-zinc-600 dark:text-zinc-400">
@@ -80,6 +88,14 @@ export function RepositoryHeader() {
                 Turborepo
               </span>
             )}
+          </>
+        ) : (
+          <>
+            <span className="flex items-center gap-1.5">
+              <div className="h-2.5 w-2.5 rounded-full bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+              <div className="h-3.5 w-16 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+            </span>
+            <div className="h-6 w-20 rounded-md bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
           </>
         )}
         <UserMenu />

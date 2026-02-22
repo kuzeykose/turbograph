@@ -60,12 +60,48 @@ export default function RepositoryPage() {
 
   if (authLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent text-zinc-900 dark:text-zinc-50" />
-          <p className="mt-4 text-zinc-600 dark:text-zinc-400">Loading...</p>
+      <>
+        {/* Sidebar skeleton */}
+        <div className="hidden lg:block w-[48px] flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 h-full">
+          <div className="flex flex-col gap-2 p-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-8 w-8 rounded-sm bg-zinc-200 dark:bg-zinc-700 animate-pulse"
+              />
+            ))}
+          </div>
         </div>
-      </div>
+        {/* Main content skeleton */}
+        <main className="flex-1 min-h-0 overflow-hidden flex flex-col p-6 gap-6">
+          {/* File tree skeleton */}
+          <div className="flex gap-4 flex-1 min-h-0">
+            <div className="w-64 flex-shrink-0 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 space-y-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className="h-4 w-4 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse flex-shrink-0" />
+                  <div
+                    className={`h-3.5 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse ${
+                      i % 3 === 0 ? "w-3/4" : i % 3 === 1 ? "w-1/2" : "w-2/3"
+                    }`}
+                  />
+                </div>
+              ))}
+            </div>
+            {/* Code viewer skeleton */}
+            <div className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-3">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-3 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse ${
+                    i % 4 === 0 ? "w-full" : i % 4 === 1 ? "w-5/6" : i % 4 === 2 ? "w-3/4" : "w-2/3"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        </main>
+      </>
     );
   }
 
@@ -103,6 +139,30 @@ export default function RepositoryPage() {
           {error && (
             <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
               {error}
+            </div>
+          )}
+
+          {/* Turborepo loading skeleton */}
+          {turborepoLoading && !turborepoStructure && activeTab !== "files" && (
+            <div className="flex-1 p-6 space-y-6">
+              {/* Graph area skeleton */}
+              <div className="space-y-3">
+                <div className="h-5 w-40 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                <div className="h-64 w-full rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+              </div>
+              {/* Stats cards skeleton */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 space-y-3"
+                  >
+                    <div className="h-3.5 w-24 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse" />
+                    <div className="h-8 w-16 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                    <div className="h-3 w-32 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

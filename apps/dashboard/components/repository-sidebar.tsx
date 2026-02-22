@@ -91,11 +91,41 @@ function SidebarNavCollapsed({
   );
 }
 
+function SidebarSkeletonCollapsed() {
+  return (
+    <nav className="flex flex-col gap-2 p-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="h-8 w-8 rounded-sm bg-zinc-200 dark:bg-zinc-700 animate-pulse"
+        />
+      ))}
+    </nav>
+  );
+}
+
+function SidebarSkeletonExpanded() {
+  const widths = ["w-20", "w-16", "w-14", "w-10"];
+  return (
+    <nav className="flex flex-col gap-2 p-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-8 flex items-center gap-3 rounded-sm p-2">
+          <div className="h-4 w-4 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse flex-shrink-0" />
+          <div
+            className={`h-3.5 ${widths[i]} rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse`}
+          />
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 export function RepositorySidebar() {
-  const { turborepoStructure, dependencyGraph, activeTab, setActiveTab } =
+  const { turborepoStructure, turborepoLoading, dependencyGraph, activeTab, setActiveTab } =
     useRepositoryContext();
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  const isInitialLoading = turborepoLoading && turborepoStructure === null;
   const isTurborepo = turborepoStructure?.isTurborepo ?? false;
 
   const navItems: NavItem[] = [
@@ -146,11 +176,15 @@ export function RepositorySidebar() {
             <SheetHeader className="border-b border-zinc-200 dark:border-zinc-800">
               <SheetTitle>Navigation</SheetTitle>
             </SheetHeader>
-            <SidebarNavExpanded
-              items={navItems}
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-            />
+            {isInitialLoading ? (
+              <SidebarSkeletonExpanded />
+            ) : (
+              <SidebarNavExpanded
+                items={navItems}
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+              />
+            )}
           </SheetContent>
         </Sheet>
       </div>
@@ -159,20 +193,28 @@ export function RepositorySidebar() {
       <div className="hidden lg:block group relative h-full">
         {/* Collapsed sidebar - visible by default */}
         <aside className="w-[48px] flex-shrink-0 flex flex-col border-r border-zinc-200 dark:border-zinc-800 h-full group-hover:opacity-0 transition-opacity duration-200">
-          <SidebarNavCollapsed
-            items={navItems}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+          {isInitialLoading ? (
+            <SidebarSkeletonCollapsed />
+          ) : (
+            <SidebarNavCollapsed
+              items={navItems}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+          )}
         </aside>
 
         {/* Expanded sidebar - shows on hover */}
         <aside className="absolute left-0 top-0 w-48 flex flex-col border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black h-full shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-10">
-          <SidebarNavExpanded
-            items={navItems}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+          {isInitialLoading ? (
+            <SidebarSkeletonExpanded />
+          ) : (
+            <SidebarNavExpanded
+              items={navItems}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+          )}
         </aside>
       </div>
     </>
