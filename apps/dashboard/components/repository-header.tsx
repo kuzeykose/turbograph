@@ -11,6 +11,7 @@ import {
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
 import { BranchSelector } from "./branch-selector";
+import { UserMenu } from "./user-menu";
 
 export function RepositoryHeader() {
   const { user } = useAuth();
@@ -61,25 +62,28 @@ export function RepositoryHeader() {
         )}
       </div>
 
-      {/* Right: Stats */}
-      {repository && (
-        <div className="flex items-center gap-3">
-          {repository.language && (
-            <span className="flex items-center gap-1.5 text-sm text-zinc-600 dark:text-zinc-400">
-              <span
-                className="w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: languageColor }}
-              />
-              {repository.language}
-            </span>
-          )}
-          {turborepoStructure?.isTurborepo && (
-            <span className="px-2 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/30 rounded-md border border-purple-200 dark:border-purple-800">
-              Turborepo
-            </span>
-          )}
-        </div>
-      )}
+      {/* Right: Stats + Avatar */}
+      <div className="flex items-center gap-3">
+        {repository && (
+          <>
+            {repository.language && (
+              <span className="flex items-center gap-1.5 text-sm text-zinc-600 dark:text-zinc-400">
+                <span
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: languageColor }}
+                />
+                {repository.language}
+              </span>
+            )}
+            {turborepoStructure?.isTurborepo && (
+              <span className="px-2 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/30 rounded-md border border-purple-200 dark:border-purple-800">
+                Turborepo
+              </span>
+            )}
+          </>
+        )}
+        <UserMenu />
+      </div>
     </div>
   );
 }

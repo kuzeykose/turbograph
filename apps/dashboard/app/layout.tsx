@@ -4,7 +4,6 @@ import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
 import { ThemeProvider } from "@/contexts/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { QueryProvider } from "@/components/query-provider";
 
 const geistSans = Geist({
@@ -37,9 +36,6 @@ export default function RootLayout({
           <QueryProvider>
             <AuthProvider>{children}</AuthProvider>
           </QueryProvider>
-          <div className="fixed bottom-4 right-4 z-50">
-            <ThemeToggle />
-          </div>
         </ThemeProvider>
         <Analytics />
       </body>

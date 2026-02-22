@@ -99,23 +99,18 @@ export function RepositorySidebar() {
   const isTurborepo = turborepoStructure?.isTurborepo ?? false;
 
   const navItems: NavItem[] = [
-    {
-      value: "files",
-      label: "Files",
-      icon: <Folder className="h-4 w-4" />,
-    },
     ...(isTurborepo
       ? [
-          {
-            value: "commits" as const,
-            label: "Commits",
-            icon: <Clock className="h-4 w-4" />,
-          },
           {
             value: "turborepo" as const,
             label: "Dependencies",
             icon: <BarChart3 className="h-4 w-4" />,
             badge: dependencyGraph.length,
+          },
+          {
+            value: "commits" as const,
+            label: "Commits",
+            icon: <Clock className="h-4 w-4" />,
           },
           {
             value: "packages" as const,
@@ -124,6 +119,11 @@ export function RepositorySidebar() {
           },
         ]
       : []),
+    {
+      value: "files",
+      label: "Files",
+      icon: <Folder className="h-4 w-4" />,
+    },
   ];
 
   const handleTabChange = (tab: TabValue) => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Monitor } from "@workspace/ui/icons";
+import { Button } from "@workspace/ui/components/button";
 
 export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
@@ -14,9 +15,9 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <button className="p-2 rounded-lg bg-background border border-border shadow-lg">
+      <Button variant="outline" size="icon">
         <div className="w-5 h-5" />
-      </button>
+      </Button>
     );
   }
 
@@ -31,14 +32,15 @@ export function ThemeToggle() {
   };
 
   return (
-    <button
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={cycleTheme}
-      className="p-2 rounded-lg bg-background border border-border shadow-lg hover:bg-accent transition-colors"
       title={`Current: ${theme}. Click to switch.`}
     >
       {theme === "light" && <Sun className="w-5 h-5" />}
       {theme === "dark" && <Moon className="w-5 h-5" />}
       {theme === "system" && <Monitor className="w-5 h-5" />}
-    </button>
+    </Button>
   );
 }

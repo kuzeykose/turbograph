@@ -11,8 +11,9 @@ import {
   Terminal,
   GitBranch,
 } from "@workspace/ui/icons";
+import { Button } from "@workspace/ui/components/button";
 import { Header } from "@/components/header";
-import { Separator } from "@workspace/ui/components/separator";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { TurborepoGraphVisual } from "@/components/turborepo-graph-visual";
 
 import {
@@ -436,20 +437,29 @@ export default function Home() {
       {/* ── Footer ───────────────────────────────────────── */}
       <footer className="border-t border-border">
         <div className="mx-auto max-w-5xl px-6 py-6">
-          <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
-            <span className="font-medium">Turbograph</span>
-            <Separator orientation="vertical" className="h-4" />
-            <a
-              href="https://github.com/kuzeykose/turbograph"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-            >
-              <Github className="w-3.5 h-3.5" />
-              GitHub
-            </a>
-            <Separator orientation="vertical" className="h-4" />
-            <span>MIT License</span>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Waypoints className="w-4 h-4 text-violet-500" />
+              <span className="text-sm font-medium text-foreground">
+                Turbograph
+              </span>
+              <span className="text-xs text-muted-foreground/50">
+                &copy; {new Date().getFullYear()}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" asChild>
+                <a
+                  href="https://github.com/kuzeykose/turbograph"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Github className="w-4 h-4" />
+                </a>
+              </Button>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </footer>

@@ -59,7 +59,7 @@ export function RepositoryProvider({
   const [activeTab, setActiveTabState] = useState<TabValue>(
     tabFromUrl && ["files", "commits", "turborepo", "packages"].includes(tabFromUrl)
       ? tabFromUrl
-      : "files"
+      : "turborepo"
   );
 
   // Repository data via TanStack Query
@@ -85,8 +85,8 @@ export function RepositoryProvider({
 
       // Update URL with new tab param
       const params = new URLSearchParams(searchParams.toString());
-      if (tab === "files") {
-        params.delete("tab"); // "files" is default, no need to show in URL
+      if (tab === "turborepo") {
+        params.delete("tab"); // "turborepo" is default, no need to show in URL
       } else {
         params.set("tab", tab);
       }
@@ -107,7 +107,7 @@ export function RepositoryProvider({
     const newTab =
       tabFromUrl && ["files", "commits", "turborepo", "packages"].includes(tabFromUrl)
         ? tabFromUrl
-        : "files";
+        : "turborepo";
     setActiveTabState(newTab);
   }, [searchParams]);
 
