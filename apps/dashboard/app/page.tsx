@@ -137,6 +137,11 @@ const steps = [
   },
 ];
 
+const exampleRepos = [
+  { owner: "vercel", repo: "turbo", label: "vercel/turbo" },
+  { owner: "vercel", repo: "next.js", label: "vercel/next.js" },
+];
+
 // ── Page ──────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -183,30 +188,27 @@ export default function Home() {
 
   const searchForm = (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={repoUrl}
-            onChange={(e) => {
-              setRepoUrl(e.target.value);
-              setUrlError(null);
-            }}
-            placeholder="vercel/turbo"
-            className="w-full h-11 pl-10 pr-4 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-          />
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50" />
+        <input
+          type="text"
+          value={repoUrl}
+          onChange={(e) => {
+            setRepoUrl(e.target.value);
+            setUrlError(null);
+          }}
+          placeholder="vercel/turbo"
+          className="w-full h-10 pl-10 pr-12 rounded-md border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-foreground/20 transition-colors"
+        />
         <button
           type="submit"
-          className="h-11 px-5 rounded-lg bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors flex items-center gap-2"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded text-muted-foreground hover:text-foreground transition-colors"
         >
-          Explore
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-4 h-4" />
         </button>
       </div>
       {urlError && (
-        <p className="mt-2 text-sm text-destructive">{urlError}</p>
+        <p className="mt-1.5 text-xs text-destructive">{urlError}</p>
       )}
     </form>
   );
@@ -250,12 +252,27 @@ export default function Home() {
               {searchForm}
             </div>
 
-            <p
-              className="mt-5 text-xs text-muted-foreground/60 animate-fade-up"
-              style={{ animationDelay: "250ms" }}
+            <div
+              className="mt-5 flex items-center justify-center gap-2 flex-wrap"
             >
-              Try: vercel/turbo, calcom/cal.com, or any public Turborepo
-            </p>
+              <span className="text-xs text-muted-foreground/60 animate-pop-in" style={{ animationDelay: "350ms" }}>Try:</span>
+              {exampleRepos.map((example, i) => (
+                <Button
+                  key={example.label}
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    router.push(
+                      `/repository/${example.owner}/${example.repo}`,
+                    )
+                  }
+                  className="rounded-full text-xs text-muted-foreground hover:text-foreground cursor-pointer animate-pop-in shimmer-border"
+                  style={{ animationDelay: `${400 + i * 75}ms` }}
+                >
+                  {example.label}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* Graph hero -- the real interactive component */}
