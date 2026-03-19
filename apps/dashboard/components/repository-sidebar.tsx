@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRepositoryContext } from "@/contexts/repository-context";
-import { Folder, Clock, BarChart3, List, Menu } from "@workspace/ui/icons";
+import { Clock, BarChart3, List, Menu } from "@workspace/ui/icons";
 import { Button } from "@workspace/ui/components/button";
 import {
   Sheet,
@@ -19,7 +19,6 @@ interface NavItem {
   value: TabValue;
   label: string;
   icon: React.ReactNode;
-  badge?: number;
 }
 
 function SidebarNavExpanded({
@@ -46,11 +45,6 @@ function SidebarNavExpanded({
         >
           <span className="flex-shrink-0">{item.icon}</span>
           {item.label}
-          {item.badge !== undefined && item.badge > 0 && (
-            <span className="ml-auto rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              {item.badge}
-            </span>
-          )}
         </button>
       ))}
     </nav>
@@ -73,18 +67,13 @@ function SidebarNavCollapsed({
           key={item.value}
           onClick={() => onTabChange(item.value)}
           className={cn(
-            "h-8 rounded-sm p-2 transition-colors relative",
+            "h-8 rounded-sm p-2 transition-colors",
             activeTab === item.value
               ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
               : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-50",
           )}
         >
           <span className="flex-shrink-0">{item.icon}</span>
-          {item.badge !== undefined && item.badge > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-medium text-white">
-              {item.badge > 99 ? "99+" : item.badge}
-            </span>
-          )}
         </button>
       ))}
     </nav>
@@ -94,7 +83,7 @@ function SidebarNavCollapsed({
 function SidebarSkeletonCollapsed() {
   return (
     <nav className="flex flex-col gap-2 p-2">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 3 }).map((_, i) => (
         <div
           key={i}
           className="h-8 w-8 rounded-sm bg-zinc-200 dark:bg-zinc-700 animate-pulse"
@@ -105,10 +94,10 @@ function SidebarSkeletonCollapsed() {
 }
 
 function SidebarSkeletonExpanded() {
-  const widths = ["w-20", "w-16", "w-14", "w-10"];
+  const widths = ["w-20", "w-16", "w-14"];
   return (
     <nav className="flex flex-col gap-2 p-2">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 3 }).map((_, i) => (
         <div key={i} className="h-8 flex items-center gap-3 rounded-sm p-2">
           <div className="h-4 w-4 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse flex-shrink-0" />
           <div
@@ -121,7 +110,7 @@ function SidebarSkeletonExpanded() {
 }
 
 export function RepositorySidebar() {
-  const { turborepoStructure, turborepoLoading, dependencyGraph, activeTab, setActiveTab } =
+  const { turborepoStructure, turborepoLoading, activeTab, setActiveTab } =
     useRepositoryContext();
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -131,29 +120,29 @@ export function RepositorySidebar() {
   const navItems: NavItem[] = [
     ...(isTurborepo
       ? [
-          {
-            value: "turborepo" as const,
-            label: "Dependencies",
-            icon: <BarChart3 className="h-4 w-4" />,
-            badge: dependencyGraph.length,
-          },
-          {
-            value: "commits" as const,
-            label: "Commits",
-            icon: <Clock className="h-4 w-4" />,
-          },
-          {
-            value: "packages" as const,
-            label: "Packages",
-            icon: <List className="h-4 w-4" />,
-          },
-        ]
+        {
+          value: "turborepo" as const,
+          label: "Dependencies",
+          icon: <BarChart3 className="h-4 w-4" />,
+        },
+        {
+          value: "commits" as const,
+          label: "Commits",
+          icon: <Clock className="h-4 w-4" />,
+        },
+        {
+          value: "packages" as const,
+          label: "Packages",
+          icon: <List className="h-4 w-4" />,
+        },
+      ]
       : []),
-    {
-      value: "files",
-      label: "Files",
-      icon: <Folder className="h-4 w-4" />,
-    },
+    // Files tab hidden for now — restore with Folder import when bringing it back
+    // {
+    //   value: "files",
+    //   label: "Files",
+    //   icon: <Folder className="h-4 w-4" />,
+    // },
   ];
 
   const handleTabChange = (tab: TabValue) => {

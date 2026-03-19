@@ -64,7 +64,7 @@ export default function RepositoryPage() {
         {/* Sidebar skeleton */}
         <div className="hidden lg:block w-[48px] flex-shrink-0 border-r border-zinc-200 dark:border-zinc-800 h-full">
           <div className="flex flex-col gap-2 p-2">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
                 className="h-8 w-8 rounded-sm bg-zinc-200 dark:bg-zinc-700 animate-pulse"
