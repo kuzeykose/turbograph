@@ -364,13 +364,14 @@ export function TurborepoGraphVisual({
     if (nodes.length === 0 || !svgRef.current) return;
 
     const padding = 80;
-    const nodeRadius = 36;
+    const nodeHalfW = 40;
+    const nodeHalfH = 26;
 
     // Calculate bounding box of all nodes
-    const minX = Math.min(...nodes.map((n) => n.x)) - nodeRadius - padding;
-    const maxX = Math.max(...nodes.map((n) => n.x)) + nodeRadius + padding;
-    const minY = Math.min(...nodes.map((n) => n.y)) - nodeRadius - padding;
-    const maxY = Math.max(...nodes.map((n) => n.y)) + nodeRadius + padding;
+    const minX = Math.min(...nodes.map((n) => n.x)) - nodeHalfW - padding;
+    const maxX = Math.max(...nodes.map((n) => n.x)) + nodeHalfW + padding;
+    const minY = Math.min(...nodes.map((n) => n.y)) - nodeHalfH - padding;
+    const maxY = Math.max(...nodes.map((n) => n.y)) + nodeHalfH + padding;
 
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
@@ -425,11 +426,20 @@ export function TurborepoGraphVisual({
 
       if (dist === 0) return "";
 
-      const nodeRadius = 36;
-      const sourceX = source.x + (dx / dist) * nodeRadius;
-      const sourceY = source.y + (dy / dist) * nodeRadius;
-      const targetX = target.x - (dx / dist) * (nodeRadius + 8);
-      const targetY = target.y - (dy / dist) * (nodeRadius + 8);
+      const halfW = 40;
+      const halfH = 26;
+      // Find intersection of the line with the source/target rectangles
+      const angle = Math.atan2(dy, dx);
+      const absCos = Math.abs(Math.cos(angle));
+      const absSin = Math.abs(Math.sin(angle));
+      const srcDist = absCos * halfH > absSin * halfW
+        ? halfW / absCos
+        : halfH / absSin;
+      const tgtDist = srcDist + 8;
+      const sourceX = source.x + Math.cos(angle) * srcDist;
+      const sourceY = source.y + Math.sin(angle) * srcDist;
+      const targetX = target.x - Math.cos(angle) * tgtDist;
+      const targetY = target.y - Math.sin(angle) * tgtDist;
 
       const midX = (sourceX + targetX) / 2;
       const midY = (sourceY + targetY) / 2;
@@ -636,18 +646,28 @@ export function TurborepoGraphVisual({
                   }}
                   filter={isSelected || isHovered ? "url(#glow)" : undefined}
                 >
-                  {/* Node circle */}
-                  <circle
-                    r={isSelected ? 40 : isHovered ? 38 : 36}
+                  {/* Node rectangle */}
+                  <rect
+                    x={isSelected ? -44 : isHovered ? -42 : -40}
+                    y={isSelected ? -30 : isHovered ? -28 : -26}
+                    width={isSelected ? 88 : isHovered ? 84 : 80}
+                    height={isSelected ? 60 : isHovered ? 56 : 52}
+                    rx={8}
+                    ry={8}
                     fill={colors.fill}
                     stroke={isSelected ? "oklch(0.95 0 0)" : colors.stroke}
                     strokeWidth={isSelected ? 3 : 2}
                     className="transition-all duration-150"
                   />
 
-                  {/* Inner ring */}
-                  <circle
-                    r={28}
+                  {/* Inner border */}
+                  <rect
+                    x={-34}
+                    y={-20}
+                    width={68}
+                    height={40}
+                    rx={5}
+                    ry={5}
                     fill="none"
                     stroke="oklch(0.95 0 0 / 0.15)"
                     strokeWidth={1}
@@ -780,7 +800,7 @@ export function TurborepoGraphVisual({
           {(["app", "package"] as const).map((type) => (
             <div key={type} className="flex items-center gap-2">
               <div
-                className="flex h-5 w-5 items-center justify-center rounded-full"
+                className="flex h-5 w-5 items-center justify-center rounded-md"
                 style={{ backgroundColor: nodeColors[type].fill }}
               >
                 <NodeIcon type={type} />

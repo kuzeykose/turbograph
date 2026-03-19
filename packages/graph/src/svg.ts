@@ -1,7 +1,8 @@
 import type { GraphNode, GraphEdge } from "./types";
 import { nodeColorsHex, edgeColorsHex } from "./colors";
 
-const DEFAULT_NODE_RADIUS = 36;
+const DEFAULT_NODE_HALF_W = 40;
+const DEFAULT_NODE_HALF_H = 26;
 
 /**
  * Options for SVG generation
@@ -9,18 +10,20 @@ const DEFAULT_NODE_RADIUS = 36;
 export interface SvgOptions {
   width?: number;
   height?: number;
-  nodeRadius?: number;
+  nodeHalfW?: number;
+  nodeHalfH?: number;
   backgroundColor?: string;
   showGrid?: boolean;
 }
 
 /**
- * Generate a curved edge path between two nodes
+ * Generate a curved edge path between two nodes (rectangle-aware)
  */
 export function generateEdgePath(
   source: GraphNode,
   target: GraphNode,
-  nodeRadius: number = DEFAULT_NODE_RADIUS
+  halfW: number = DEFAULT_NODE_HALF_W,
+  halfH: number = DEFAULT_NODE_HALF_H
 ): string {
   const dx = target.x - source.x;
   const dy = target.y - source.y;
@@ -28,10 +31,18 @@ export function generateEdgePath(
 
   if (dist === 0) return "";
 
-  const sourceX = source.x + (dx / dist) * nodeRadius;
-  const sourceY = source.y + (dy / dist) * nodeRadius;
-  const targetX = target.x - (dx / dist) * (nodeRadius + 8);
-  const targetY = target.y - (dy / dist) * (nodeRadius + 8);
+  const angle = Math.atan2(dy, dx);
+  const absCos = Math.abs(Math.cos(angle));
+  const absSin = Math.abs(Math.sin(angle));
+  const srcDist = absCos * halfH > absSin * halfW
+    ? halfW / absCos
+    : halfH / absSin;
+  const tgtDist = srcDist + 8;
+
+  const sourceX = source.x + Math.cos(angle) * srcDist;
+  const sourceY = source.y + Math.sin(angle) * srcDist;
+  const targetX = target.x - Math.cos(angle) * tgtDist;
+  const targetY = target.y - Math.sin(angle) * tgtDist;
 
   const midX = (sourceX + targetX) / 2;
   const midY = (sourceY + targetY) / 2;
@@ -52,7 +63,8 @@ export function generateSvgDocument(
 ): string {
   const width = options?.width ?? 900;
   const height = options?.height ?? 550;
-  const nodeRadius = options?.nodeRadius ?? DEFAULT_NODE_RADIUS;
+  const halfW = options?.nodeHalfW ?? DEFAULT_NODE_HALF_W;
+  const halfH = options?.nodeHalfH ?? DEFAULT_NODE_HALF_H;
   const backgroundColor = options?.backgroundColor ?? "#0a0a0a";
   const showGrid = options?.showGrid ?? true;
 
@@ -66,7 +78,7 @@ export function generateSvgDocument(
       const target = nodeMap.get(edge.target);
       if (!source || !target) return "";
 
-      const path = generateEdgePath(source, target, nodeRadius);
+      const path = generateEdgePath(source, target, halfW, halfH);
       const color = edgeColorsHex[edge.type];
       const dashArray =
         edge.type === "devDependency" ? 'stroke-dasharray="6 4"' : "";
@@ -85,9 +97,11 @@ export function generateSvgDocument(
         node.name.substring(0, 12);
       const icon = node.type === "app" ? "□" : "⊞";
 
+      const halfW = 40;
+      const halfH = 26;
       return `    <g transform="translate(${node.x}, ${node.y})">
-      <circle r="${nodeRadius}" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2"/>
-      <circle r="28" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+      <rect x="${-halfW}" y="${-halfH}" width="${halfW * 2}" height="${halfH * 2}" rx="8" ry="8" fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2"/>
+      <rect x="-34" y="-20" width="68" height="40" rx="5" ry="5" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
       <text text-anchor="middle" y="-8" fill="white" font-size="12" font-family="system-ui, sans-serif">${icon}</text>
       <text text-anchor="middle" y="6" fill="white" font-size="10" font-weight="600" font-family="system-ui, sans-serif">${displayName}</text>
       <text text-anchor="middle" y="18" fill="rgba(255,255,255,0.6)" font-size="8" font-family="system-ui, sans-serif">${node.dependencies}d / ${node.dependents}r</text>
