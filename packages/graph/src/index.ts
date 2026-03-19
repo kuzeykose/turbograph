@@ -16,7 +16,7 @@ export {
 } from "./colors";
 
 // Layout
-export type { LayoutOptions } from "./layout";
+export type { LayoutOptions, GraphLayerOrder } from "./layout";
 export {
   calculateGraphLayout,
   buildDependencyGraph,
@@ -24,6 +24,13 @@ export {
   getDownstreamDependents,
 } from "./layout";
 
+// Shared layout / rendering constants
+export {
+  GRAPH_NODE_CARD,
+  DEFAULT_MIN_VERTICAL_GAP,
+  DEFAULT_MIN_LEVEL_WIDTH,
+} from "./constants";
+
 // SVG
-export type { SvgOptions } from "./svg";
+export type { SvgOptions, EdgePathOptions } from "./svg";
 export { generateEdgePath, generateSvgDocument } from "./svg";

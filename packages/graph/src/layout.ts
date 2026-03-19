@@ -5,6 +5,17 @@ import type {
   GraphEdge,
   TurborepoStructure,
 } from "./types";
+import {
+  DEFAULT_MIN_LEVEL_WIDTH,
+  DEFAULT_MIN_VERTICAL_GAP,
+} from "./constants";
+
+/**
+ * Horizontal layer order for the hierarchical layout.
+ * - `roots-first`: nodes nothing depends on (entries) on the left, dependencies flow right.
+ * - `leaves-first`: workspace leaves (no workspace deps) on the left, dependents flow right.
+ */
+export type GraphLayerOrder = "roots-first" | "leaves-first";
 
 /**
  * Options for the graph layout algorithm
@@ -13,6 +24,15 @@ export interface LayoutOptions {
   width?: number;
   height?: number;
   padding?: number;
+  /** Minimum vertical spacing between node centers in the same depth column */
+  minVerticalGap?: number;
+  /** Minimum horizontal spacing between adjacent depth columns */
+  minLevelWidth?: number;
+  /**
+   * How columns are ordered left-to-right.
+   * @default "roots-first"
+   */
+  layerOrder?: GraphLayerOrder;
 }
 
 const DEFAULT_WIDTH = 900;
@@ -103,10 +123,101 @@ export function buildDependencyGraph(
   return edges;
 }
 
+function computeNodeDepthRootsFirst(
+  allNodeIds: Set<string>,
+  dependsOn: Map<string, Set<string>>,
+  dependedBy: Map<string, Set<string>>,
+): Map<string, number> {
+  const nodeDepth = new Map<string, number>();
+  const indegreeMap = new Map<string, number>();
+  allNodeIds.forEach((id) => {
+    indegreeMap.set(id, dependedBy.get(id)?.size ?? 0);
+  });
+
+  const queue: string[] = [];
+  allNodeIds.forEach((id) => {
+    if (indegreeMap.get(id) === 0) {
+      nodeDepth.set(id, 0);
+      queue.push(id);
+    }
+  });
+
+  while (queue.length > 0) {
+    const u = queue.shift()!;
+    const du = nodeDepth.get(u)!;
+    for (const v of dependsOn.get(u) ?? []) {
+      const next = du + 1;
+      const prev = nodeDepth.get(v);
+      if (prev === undefined || next > prev) {
+        nodeDepth.set(v, next);
+      }
+      indegreeMap.set(v, (indegreeMap.get(v) ?? 0) - 1);
+      if (indegreeMap.get(v) === 0) {
+        queue.push(v);
+      }
+    }
+  }
+
+  allNodeIds.forEach((id) => {
+    if (!nodeDepth.has(id)) {
+      nodeDepth.set(id, 0);
+    }
+  });
+
+  return nodeDepth;
+}
+
+function computeNodeDepthLeavesFirst(
+  allNodeIds: Set<string>,
+  dependsOn: Map<string, Set<string>>,
+  dependedBy: Map<string, Set<string>>,
+): Map<string, number> {
+  const nodeDepth = new Map<string, number>();
+  const queue: string[] = [];
+
+  allNodeIds.forEach((id) => {
+    if (dependsOn.get(id)?.size === 0) {
+      nodeDepth.set(id, 0);
+      queue.push(id);
+    }
+  });
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const currentDepth = nodeDepth.get(current)!;
+
+    dependedBy.get(current)?.forEach((parent) => {
+      const existingDepth = nodeDepth.get(parent);
+      const newDepth = currentDepth + 1;
+
+      if (existingDepth === undefined || newDepth > existingDepth) {
+        nodeDepth.set(parent, newDepth);
+      }
+
+      const parentDeps = dependsOn.get(parent);
+      const allDepsProcessed = [...(parentDeps ?? [])].every((dep) =>
+        nodeDepth.has(dep),
+      );
+
+      if (allDepsProcessed && !queue.includes(parent)) {
+        queue.push(parent);
+      }
+    });
+  }
+
+  allNodeIds.forEach((id) => {
+    if (!nodeDepth.has(id)) {
+      nodeDepth.set(id, 0);
+    }
+  });
+
+  return nodeDepth;
+}
+
 /**
- * Calculate the graph layout using a hierarchical BFS algorithm
- * Places leaf nodes (packages with no dependencies) on the left,
- * and dependent packages progressively to the right.
+ * Calculate the graph layout using a hierarchical layered algorithm.
+ * Default (`roots-first`): entry packages on the left, shared dependencies to the right.
+ * `leaves-first`: workspace leaves on the left, consumers to the right.
  */
 export function calculateGraphLayout(
   apps: PackageInfo[],
@@ -114,9 +225,13 @@ export function calculateGraphLayout(
   dependencies: DependencyEdge[],
   options?: LayoutOptions
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
-  const width = options?.width ?? DEFAULT_WIDTH;
-  const height = options?.height ?? DEFAULT_HEIGHT;
+  const baseWidth = options?.width ?? DEFAULT_WIDTH;
+  const baseHeight = options?.height ?? DEFAULT_HEIGHT;
   const padding = options?.padding ?? DEFAULT_PADDING;
+  const minVerticalGap =
+    options?.minVerticalGap ?? DEFAULT_MIN_VERTICAL_GAP;
+  const minLevelWidth = options?.minLevelWidth ?? DEFAULT_MIN_LEVEL_WIDTH;
+  const layerOrder: GraphLayerOrder = options?.layerOrder ?? "roots-first";
 
   // Create edges
   const graphEdges: GraphEdge[] = dependencies.map((dep, idx) => ({
@@ -152,46 +267,10 @@ export function calculateGraphLayout(
     dependentCount.set(id, dependedBy.get(id)?.size ?? 0);
   });
 
-  // Calculate depth using BFS from leaf nodes
-  const nodeDepth = new Map<string, number>();
-  const queue: string[] = [];
-
-  allNodeIds.forEach((id) => {
-    if (dependsOn.get(id)?.size === 0) {
-      nodeDepth.set(id, 0);
-      queue.push(id);
-    }
-  });
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const currentDepth = nodeDepth.get(current)!;
-
-    dependedBy.get(current)?.forEach((parent) => {
-      const existingDepth = nodeDepth.get(parent);
-      const newDepth = currentDepth + 1;
-
-      if (existingDepth === undefined || newDepth > existingDepth) {
-        nodeDepth.set(parent, newDepth);
-      }
-
-      const parentDeps = dependsOn.get(parent);
-      const allDepsProcessed = [...(parentDeps ?? [])].every((dep) =>
-        nodeDepth.has(dep)
-      );
-
-      if (allDepsProcessed && !queue.includes(parent)) {
-        queue.push(parent);
-      }
-    });
-  }
-
-  // Handle remaining nodes (circular dependencies or isolated)
-  allNodeIds.forEach((id) => {
-    if (!nodeDepth.has(id)) {
-      nodeDepth.set(id, 0);
-    }
-  });
+  const nodeDepth =
+    layerOrder === "roots-first"
+      ? computeNodeDepthRootsFirst(allNodeIds, dependsOn, dependedBy)
+      : computeNodeDepthLeavesFirst(allNodeIds, dependsOn, dependedBy);
 
   // Group nodes by depth
   const nodesByDepth = new Map<number, string[]>();
@@ -203,7 +282,21 @@ export function calculateGraphLayout(
   });
 
   const maxDepth = Math.max(...nodeDepth.values(), 0);
-  const levelWidth = (width - 2 * padding) / Math.max(1, maxDepth);
+
+  const layerSizes = [...nodesByDepth.values()].map((ids) => ids.length);
+  const maxNodesInLayer = Math.max(1, ...layerSizes);
+
+  const layoutHeight = Math.max(
+    baseHeight,
+    2 * padding + maxNodesInLayer * minVerticalGap
+  );
+  const layoutWidth = Math.max(
+    baseWidth,
+    2 * padding + maxDepth * minLevelWidth
+  );
+
+  const levelWidth =
+    (layoutWidth - 2 * padding) / Math.max(1, maxDepth);
 
   // Create nodes with hierarchical positions
   const graphNodes: GraphNode[] = [];
@@ -214,7 +307,7 @@ export function calculateGraphLayout(
   nodesByDepth.forEach((nodesAtDepth, depth) => {
     const x = padding + depth * levelWidth;
     const verticalSpacing =
-      (height - 2 * padding) / Math.max(1, nodesAtDepth.length);
+      (layoutHeight - 2 * padding) / Math.max(1, nodesAtDepth.length);
 
     nodesAtDepth.forEach((nodeId, index) => {
       const y = padding + verticalSpacing * (index + 0.5);

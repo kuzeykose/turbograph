@@ -61,11 +61,13 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      expect(screen.getByText("Reset View")).toBeInTheDocument();
-      expect(screen.getByText("Clear Selection")).toBeInTheDocument();
+      expect(
+        screen.getByRole("group", { name: /Graph column order/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByTitle("Fit View")).toBeInTheDocument();
     });
 
-    it("should render control buttons", () => {
+    it("should render header controls", () => {
       render(
         <TurborepoGraphVisual
           apps={mockApps}
@@ -74,28 +76,9 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      expect(screen.getByText("Reset View")).toBeInTheDocument();
-      expect(screen.getByText("Clear Selection")).toBeInTheDocument();
-    });
-
-    it("should render instructions panel", () => {
-      render(
-        <TurborepoGraphVisual
-          apps={mockApps}
-          packages={mockPackages}
-          dependencies={mockDependencies}
-        />,
-      );
-
-      expect(screen.getByText("Controls:")).toBeInTheDocument();
-      expect(
-        screen.getByText("• Drag nodes to reposition"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("• Click node to highlight connections"),
-      ).toBeInTheDocument();
-      expect(screen.getByText("• Drag background to pan")).toBeInTheDocument();
-      expect(screen.getByText("• Scroll to zoom")).toBeInTheDocument();
+      expect(screen.getByTitle("Zoom In")).toBeInTheDocument();
+      expect(screen.getByTitle("Zoom Out")).toBeInTheDocument();
+      expect(screen.getByTitle("Fit View")).toBeInTheDocument();
     });
 
     it("should render legend", () => {
@@ -107,11 +90,11 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      expect(screen.getByText("Legend")).toBeInTheDocument();
+      expect(screen.getByText("Nodes")).toBeInTheDocument();
       expect(screen.getByText("Application")).toBeInTheDocument();
       expect(screen.getByText("Package")).toBeInTheDocument();
       expect(screen.getByText("Dependency")).toBeInTheDocument();
-      expect(screen.getByText("Dev Dependency")).toBeInTheDocument();
+      expect(screen.getByText("Dev")).toBeInTheDocument();
     });
 
     it("should render SVG graph", () => {
@@ -129,7 +112,7 @@ describe("TurborepoGraphVisual", () => {
   });
 
   describe("Node Rendering", () => {
-    it("should render all app nodes", async () => {
+    it("should render all graph nodes", async () => {
       const { container } = render(
         <TurborepoGraphVisual
           apps={mockApps}
@@ -139,12 +122,12 @@ describe("TurborepoGraphVisual", () => {
       );
 
       await waitFor(() => {
-        const nodes = container.querySelectorAll(".nodes g");
-        expect(nodes.length).toBe(4); // 2 apps + 2 packages
+        const groups = container.querySelectorAll(".nodes g");
+        expect(groups.length).toBe(4);
       });
     });
 
-    it("should render all package nodes", async () => {
+    it("should render node cards as rects", async () => {
       const { container } = render(
         <TurborepoGraphVisual
           apps={mockApps}
@@ -154,12 +137,12 @@ describe("TurborepoGraphVisual", () => {
       );
 
       await waitFor(() => {
-        const circles = container.querySelectorAll(".nodes circle");
-        expect(circles.length).toBeGreaterThan(0);
+        const rects = container.querySelectorAll(".nodes rect");
+        expect(rects.length).toBe(4);
       });
     });
 
-    it("should truncate long node names", () => {
+    it("should truncate long node names in the label", () => {
       const longNameApps: PackageInfo[] = [
         {
           name: "very-long-application-name-that-should-be-truncated",
@@ -178,12 +161,12 @@ describe("TurborepoGraphVisual", () => {
       );
 
       const text = container.querySelector(".nodes text");
-      expect(text?.textContent).toMatch(/\.\.\./);
+      expect(text?.textContent).toMatch(/…/);
     });
   });
 
   describe("Edge Rendering", () => {
-    it("should render dependency edges", async () => {
+    it("should render dependency edges as paths", async () => {
       const { container } = render(
         <TurborepoGraphVisual
           apps={mockApps}
@@ -193,8 +176,8 @@ describe("TurborepoGraphVisual", () => {
       );
 
       await waitFor(() => {
-        const edges = container.querySelectorAll(".edges line");
-        expect(edges.length).toBe(mockDependencies.length);
+        const paths = container.querySelectorAll(".edges path");
+        expect(paths.length).toBe(mockDependencies.length);
       });
     });
 
@@ -208,12 +191,10 @@ describe("TurborepoGraphVisual", () => {
       );
 
       await waitFor(() => {
-        const edges = container.querySelectorAll(".edges line");
-        edges.forEach((edge) => {
-          const markerEnd = edge.getAttribute("marker-end");
-          expect(markerEnd).toMatch(
-            /url\(#arrowhead-(dependency|devDependency)\)/,
-          );
+        const paths = container.querySelectorAll(".edges path");
+        paths.forEach((path) => {
+          const markerEnd = path.getAttribute("marker-end");
+          expect(markerEnd).toMatch(/url\(#arrow-(dependency|devDependency)\)/);
         });
       });
     });
@@ -236,15 +217,15 @@ describe("TurborepoGraphVisual", () => {
       );
 
       await waitFor(() => {
-        const edge = container.querySelector(".edges line");
-        const markerEnd = edge?.getAttribute("marker-end");
+        const path = container.querySelector(".edges path");
+        const markerEnd = path?.getAttribute("marker-end");
         expect(markerEnd).toContain("devDependency");
       });
     });
   });
 
   describe("Interactions", () => {
-    it("should handle reset view button click", () => {
+    it("should handle fit view button click", () => {
       render(
         <TurborepoGraphVisual
           apps={mockApps}
@@ -253,27 +234,10 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      const resetButton = screen.getByText("Reset View");
-      fireEvent.click(resetButton);
+      const fitButton = screen.getByTitle("Fit View");
+      fireEvent.click(fitButton);
 
-      // The component should not crash and button should still be there
-      expect(resetButton).toBeInTheDocument();
-    });
-
-    it("should handle clear selection button click", () => {
-      render(
-        <TurborepoGraphVisual
-          apps={mockApps}
-          packages={mockPackages}
-          dependencies={mockDependencies}
-        />,
-      );
-
-      const clearButton = screen.getByText("Clear Selection");
-      fireEvent.click(clearButton);
-
-      // The component should not crash
-      expect(clearButton).toBeInTheDocument();
+      expect(fitButton).toBeInTheDocument();
     });
 
     it("should handle wheel event for zooming", () => {
@@ -289,14 +253,10 @@ describe("TurborepoGraphVisual", () => {
       expect(svg).toBeInTheDocument();
 
       if (svg) {
-        // Simulate zoom in
         fireEvent.wheel(svg, { deltaY: -100 });
-
-        // Simulate zoom out
         fireEvent.wheel(svg, { deltaY: 100 });
       }
 
-      // Component should handle zoom without crashing
       expect(svg).toBeInTheDocument();
     });
 
@@ -330,7 +290,7 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      expect(screen.getByText("Reset View")).toBeInTheDocument();
+      expect(screen.getByTitle("Fit View")).toBeInTheDocument();
     });
 
     it("should handle empty packages array", () => {
@@ -342,7 +302,7 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      expect(screen.getByText("Reset View")).toBeInTheDocument();
+      expect(screen.getByTitle("Fit View")).toBeInTheDocument();
     });
 
     it("should handle empty dependencies array", () => {
@@ -354,8 +314,8 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      const edges = container.querySelectorAll(".edges line");
-      expect(edges.length).toBe(0);
+      const paths = container.querySelectorAll(".edges path");
+      expect(paths.length).toBe(0);
     });
 
     it("should handle completely empty data", () => {
@@ -363,7 +323,7 @@ describe("TurborepoGraphVisual", () => {
         <TurborepoGraphVisual apps={[]} packages={[]} dependencies={[]} />,
       );
 
-      expect(screen.getByText("Legend")).toBeInTheDocument();
+      expect(screen.getByText("Nodes")).toBeInTheDocument();
     });
   });
 
@@ -379,7 +339,7 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      expect(screen.getByText("Reset View")).toBeInTheDocument();
+      expect(screen.getByTitle("Fit View")).toBeInTheDocument();
     });
 
     it("should handle single package", () => {
@@ -393,12 +353,12 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      expect(screen.getByText("Reset View")).toBeInTheDocument();
+      expect(screen.getByTitle("Fit View")).toBeInTheDocument();
     });
   });
 
-  describe("Force Simulation", () => {
-    it("should apply force simulation to nodes", async () => {
+  describe("Layout", () => {
+    it("should position nodes with transform", async () => {
       const { container } = render(
         <TurborepoGraphVisual
           apps={mockApps}
@@ -407,15 +367,13 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      // Wait for initial render
       await waitFor(() => {
-        const nodes = container.querySelectorAll(".nodes g");
-        expect(nodes.length).toBeGreaterThan(0);
+        const nodeGroups = container.querySelectorAll(".nodes g");
+        expect(nodeGroups.length).toBeGreaterThan(0);
       });
 
-      // Nodes should be positioned (transform attribute should exist)
-      const nodes = container.querySelectorAll(".nodes g");
-      nodes.forEach((node) => {
+      const nodeGroups = container.querySelectorAll(".nodes g");
+      nodeGroups.forEach((node) => {
         expect(node.getAttribute("transform")).toBeTruthy();
       });
     });
@@ -431,8 +389,8 @@ describe("TurborepoGraphVisual", () => {
         />,
       );
 
-      const depMarker = container.querySelector("#arrowhead-dependency");
-      const devDepMarker = container.querySelector("#arrowhead-devDependency");
+      const depMarker = container.querySelector("#arrow-dependency");
+      const devDepMarker = container.querySelector("#arrow-devDependency");
 
       expect(depMarker).toBeInTheDocument();
       expect(devDepMarker).toBeInTheDocument();

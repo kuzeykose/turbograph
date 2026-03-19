@@ -14,10 +14,8 @@ import {
   Maximize2,
   Minimize2,
   RotateCcw,
-  MousePointer2,
-  Move,
-  Box,
-  Boxes,
+  Github,
+  X,
 } from "@workspace/ui/icons";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -25,47 +23,132 @@ import {
   type DependencyEdge,
   type GraphNode,
   type GraphEdge,
+  type GraphLayerOrder,
   calculateGraphLayout,
+  generateEdgePath,
+  GRAPH_NODE_CARD,
   nodeColors,
   edgeColors,
 } from "@workspace/graph";
 
-// Extended node type for React state (includes velocity for force simulation)
 interface Node extends GraphNode {
-  vx: number;
-  vy: number;
   fx?: number;
   fy?: number;
 }
 
+function formatNodeLabel(fullName: string): {
+  primary: string;
+  secondary: string | null;
+} {
+  const segments = fullName.split("/");
+  const primaryRaw = segments[segments.length - 1] ?? fullName;
+  const primary =
+    primaryRaw.length > 26 ? `${primaryRaw.slice(0, 24)}…` : primaryRaw;
+
+  let secondary: string | null = null;
+  if (fullName.startsWith("@") && fullName.includes("/")) {
+    const i = fullName.indexOf("/");
+    const scope = fullName.slice(0, i + 1);
+    secondary = scope.length > 30 ? `${scope.slice(0, 28)}…` : scope;
+  } else if (segments.length > 1) {
+    const prefix = segments.slice(0, -1).join("/");
+    secondary = prefix.length > 30 ? `${prefix.slice(0, 28)}…` : prefix;
+  }
+
+  return { primary, secondary };
+}
+
 type Edge = GraphEdge;
+
+function computeFitViewBox(
+  nodeList: Pick<GraphNode, "x" | "y">[],
+  containerWidth: number,
+  containerHeight: number,
+): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zoom: number;
+} | null {
+  if (nodeList.length === 0) return null;
+
+  const padding = 80;
+  const hw = GRAPH_NODE_CARD.halfWidth;
+  const hh = GRAPH_NODE_CARD.halfHeight;
+
+  const minX = Math.min(...nodeList.map((n) => n.x)) - hw - padding;
+  const maxX = Math.max(...nodeList.map((n) => n.x)) + hw + padding;
+  const minY = Math.min(...nodeList.map((n) => n.y)) - hh - padding;
+  const maxY = Math.max(...nodeList.map((n) => n.y)) + hh + padding;
+
+  const contentWidth = maxX - minX;
+  const contentHeight = maxY - minY;
+
+  const cw = containerWidth || 900;
+  const ch = containerHeight || 550;
+
+  const scaleX = cw / contentWidth;
+  const scaleY = ch / contentHeight;
+  const scale = Math.min(scaleX, scaleY, 1);
+
+  const viewWidth = cw / scale;
+  const viewHeight = ch / scale;
+
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  return {
+    x: centerX - viewWidth / 2,
+    y: centerY - viewHeight / 2,
+    width: viewWidth,
+    height: viewHeight,
+    zoom: scale,
+  };
+}
+
+/** When set, enables “Open on GitHub” for the selected workspace package path. */
+export interface GraphGithubContext {
+  owner: string;
+  repo: string;
+  branch?: string | null;
+}
+
+function githubTreeUrl(
+  ctx: GraphGithubContext,
+  relativePath: string,
+): string {
+  const branch = ctx.branch?.trim() || "HEAD";
+  const p = relativePath.replace(/^\/+/, "");
+  return `https://github.com/${ctx.owner}/${ctx.repo}/tree/${encodeURIComponent(branch)}/${p}`;
+}
 
 interface TurborepoGraphVisualProps {
   apps: PackageInfo[];
   packages: PackageInfo[];
   dependencies: DependencyEdge[];
   className?: string;
+  github?: GraphGithubContext | null;
 }
-
-// Node type icons
-const NodeIcon = ({ type }: { type: Node["type"] }) => {
-  const iconProps = { size: 14, strokeWidth: 2 };
-  switch (type) {
-    case "app":
-      return <Box {...iconProps} />;
-    case "package":
-      return <Boxes {...iconProps} />;
-  }
-};
 
 export function TurborepoGraphVisual({
   apps,
   packages,
   dependencies,
   className,
+  github = null,
 }: TurborepoGraphVisualProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  /** Pointer-down position (SVG coords) for node drag; used to distinguish click vs drag. */
+  const nodePointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const nodeDragDidMoveRef = useRef(false);
+  /** After a real node drag, skip the following click so selection does not jump to the dragged node. */
+  const suppressNextNodeClickRef = useRef(false);
+  /** Pan started on empty graph: deselect only if pointer barely moved (click), not after a real pan. */
+  const panFromBgRef = useRef(false);
+  const panClientStartRef = useRef<{ x: number; y: number } | null>(null);
+  const panDragDidMoveRef = useRef(false);
 
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -83,6 +166,20 @@ export function TurborepoGraphVisual({
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [layerOrder, setLayerOrder] = useState<GraphLayerOrder>("roots-first");
+
+  const graphInputsKey = useMemo(
+    () =>
+      JSON.stringify({
+        appNames: apps.map((a) => a.name).sort(),
+        packageNames: packages.map((p) => p.name).sort(),
+        deps: dependencies
+          .map((d) => `${d.from}\0${d.to}\0${d.type}`)
+          .sort()
+          .join("|"),
+      }),
+    [apps, packages, dependencies],
+  );
 
   // Initialize viewBox based on actual SVG dimensions
   useLayoutEffect(() => {
@@ -104,86 +201,6 @@ export function TurborepoGraphVisual({
     window.addEventListener("resize", updateViewBox);
     return () => window.removeEventListener("resize", updateViewBox);
   }, [isFullscreen]);
-
-  // Initialize nodes and edges with hierarchical layout
-  useEffect(() => {
-    // Use shared layout calculation from @workspace/graph
-    const { nodes: layoutNodes, edges: layoutEdges } = calculateGraphLayout(
-      apps,
-      packages,
-      dependencies,
-      { width: 900, height: 550, padding: 80 }
-    );
-
-    // Extend graph nodes with velocity properties for force simulation
-    const newNodes: Node[] = layoutNodes.map((node) => ({
-      ...node,
-      vx: 0,
-      vy: 0,
-    }));
-
-    setNodes(newNodes);
-    setEdges(layoutEdges);
-  }, [apps, packages, dependencies]);
-
-  // Apply force simulation
-  useEffect(() => {
-    if (nodes.length === 0) return;
-
-    const animate = () => {
-      setNodes((prevNodes) => {
-        return prevNodes.map((node) => {
-          if (node.fx !== undefined && node.fy !== undefined) {
-            return { ...node, x: node.fx, y: node.fy };
-          }
-
-          let fx = 0;
-          let fy = 0;
-
-          prevNodes.forEach((other) => {
-            if (other.id !== node.id) {
-              const dx = node.x - other.x;
-              const dy = node.y - other.y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-
-              const sameLayer = Math.abs(dx) < 100;
-              const repulsionDistance = sameLayer ? 150 : 100;
-
-              if (distance < repulsionDistance && distance > 0) {
-                const force = (sameLayer ? 400 : 100) / (distance * distance);
-                fx += (dx / distance) * force * 0.1;
-                fy += (dy / distance) * force;
-              }
-            }
-          });
-
-          const fixedHeight = 550;
-          fy += (fixedHeight / 2 - node.y) * 0.002;
-
-          const damping = 0.7;
-          const newVx = (node.vx + fx) * damping;
-          const newVy = (node.vy + fy) * damping;
-
-          const fixedWidth = 900;
-          const newX = Math.max(
-            50,
-            Math.min(fixedWidth - 50, node.x + newVx * 0.3),
-          );
-          const newY = Math.max(50, Math.min(fixedHeight - 50, node.y + newVy));
-
-          return { ...node, x: newX, y: newY, vx: newVx, vy: newVy };
-        });
-      });
-    };
-
-    // const interval = setInterval(animate, 50);
-    // const timeout = setTimeout(() => clearInterval(interval), 2000);
-
-    return () => {
-      // clearInterval(interval);
-      // clearTimeout(timeout);
-    };
-  }, [edges]);
 
   // Get connected nodes for highlighting
   const connectedNodes = useMemo(() => {
@@ -265,9 +282,11 @@ export function TurborepoGraphVisual({
         e.target === svgRef.current ||
         (e.target as Element).classList.contains("graph-bg")
       ) {
+        panFromBgRef.current = true;
+        panClientStartRef.current = { x: e.clientX, y: e.clientY };
+        panDragDidMoveRef.current = false;
         setIsPanning(true);
         setPanStart(getSvgPoint(e.clientX, e.clientY));
-        setSelectedNode(null);
       }
     },
     [getSvgPoint],
@@ -276,6 +295,14 @@ export function TurborepoGraphVisual({
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
       if (isPanning) {
+        const pc = panClientStartRef.current;
+        if (pc) {
+          const dx = e.clientX - pc.x;
+          const dy = e.clientY - pc.y;
+          if (dx * dx + dy * dy > 36) {
+            panDragDidMoveRef.current = true;
+          }
+        }
         const current = getSvgPoint(e.clientX, e.clientY);
         setViewBox((prev) => ({
           ...prev,
@@ -284,6 +311,14 @@ export function TurborepoGraphVisual({
         }));
       } else if (draggedNode) {
         const point = getSvgPoint(e.clientX, e.clientY);
+        const start = nodePointerStartRef.current;
+        if (start) {
+          const dx = point.x - start.x;
+          const dy = point.y - start.y;
+          if (dx * dx + dy * dy > 36) {
+            nodeDragDidMoveRef.current = true;
+          }
+        }
         setNodes((prev) =>
           prev.map((node) =>
             node.id === draggedNode
@@ -304,6 +339,9 @@ export function TurborepoGraphVisual({
 
   const handleMouseUp = useCallback(() => {
     if (draggedNode) {
+      if (nodeDragDidMoveRef.current) {
+        suppressNextNodeClickRef.current = true;
+      }
       setNodes((prevNodes) =>
         prevNodes.map((node) =>
           node.id === draggedNode
@@ -312,6 +350,14 @@ export function TurborepoGraphVisual({
         ),
       );
     }
+    if (panFromBgRef.current && !panDragDidMoveRef.current) {
+      setSelectedNode(null);
+    }
+    panFromBgRef.current = false;
+    panClientStartRef.current = null;
+    panDragDidMoveRef.current = false;
+    nodePointerStartRef.current = null;
+    nodeDragDidMoveRef.current = false;
     setIsPanning(false);
     setDraggedNode(null);
   }, [draggedNode]);
@@ -323,6 +369,8 @@ export function TurborepoGraphVisual({
       const point = getSvgPoint(e.clientX, e.clientY);
       const node = nodes.find((n) => n.id === nodeId);
       if (node) {
+        nodePointerStartRef.current = { x: point.x, y: point.y };
+        nodeDragDidMoveRef.current = false;
         setDragOffset({ x: point.x - node.x, y: point.y - node.y });
         setDraggedNode(nodeId);
       }
@@ -332,6 +380,10 @@ export function TurborepoGraphVisual({
 
   const handleNodeClick = useCallback((nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (suppressNextNodeClickRef.current) {
+      suppressNextNodeClickRef.current = false;
+      return;
+    }
     setSelectedNode((prev) => (prev === nodeId ? null : nodeId));
   }, []);
 
@@ -362,85 +414,70 @@ export function TurborepoGraphVisual({
   }, []);
 
   const fitView = useCallback(() => {
-    if (nodes.length === 0 || !svgRef.current) return;
-
-    const padding = 80;
-    const nodeRadius = 36;
-
-    // Calculate bounding box of all nodes
-    const minX = Math.min(...nodes.map((n) => n.x)) - nodeRadius - padding;
-    const maxX = Math.max(...nodes.map((n) => n.x)) + nodeRadius + padding;
-    const minY = Math.min(...nodes.map((n) => n.y)) - nodeRadius - padding;
-    const maxY = Math.max(...nodes.map((n) => n.y)) + nodeRadius + padding;
-
-    const contentWidth = maxX - minX;
-    const contentHeight = maxY - minY;
-
-    // Get the SVG container dimensions
+    if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const containerWidth = rect.width || 900;
-    const containerHeight = rect.height || 550;
-
-    // Calculate scale to fit content while maintaining aspect ratio
-    const scaleX = containerWidth / contentWidth;
-    const scaleY = containerHeight / contentHeight;
-    const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in beyond 100%
-
-    // Calculate the viewBox dimensions
-    const viewWidth = containerWidth / scale;
-    const viewHeight = containerHeight / scale;
-
-    // Center the content
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    const finalX = centerX - viewWidth / 2;
-    const finalY = centerY - viewHeight / 2;
-
+    const box = computeFitViewBox(
+      nodes,
+      rect.width || 900,
+      rect.height || 550,
+    );
+    if (!box) return;
     setViewBox({
-      x: finalX,
-      y: finalY,
-      width: viewWidth,
-      height: viewHeight,
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
     });
-    setZoom(scale);
+    setZoom(box.zoom);
   }, [nodes]);
 
-  const hasFittedRef = useRef(false);
-  useEffect(() => {
-    if (nodes.length > 0 && !hasFittedRef.current) {
-      hasFittedRef.current = true;
-      fitView();
-    }
-  }, [nodes, fitView]);
+  // Hierarchical layout + fit in one pass so viewBox uses the new positions (avoids stale-node race).
+  useLayoutEffect(() => {
+    const { nodes: layoutNodes, edges: layoutEdges } = calculateGraphLayout(
+      apps,
+      packages,
+      dependencies,
+      { width: 900, height: 550, padding: 80, layerOrder },
+    );
 
-  // Calculate edge path with curve
+    setNodes(layoutNodes);
+    setEdges(layoutEdges);
+
+    if (!svgRef.current || layoutNodes.length === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const box = computeFitViewBox(
+      layoutNodes,
+      rect.width || 900,
+      rect.height || 550,
+    );
+    if (!box) return;
+    setViewBox({
+      x: box.x,
+      y: box.y,
+      width: box.width,
+      height: box.height,
+    });
+    setZoom(box.zoom);
+    // graphInputsKey fingerprints apps/packages/dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphInputsKey, layerOrder]);
+
+  const edgePathOpts = useMemo(
+    () => ({
+      halfWidth: GRAPH_NODE_CARD.halfWidth,
+      halfHeight: GRAPH_NODE_CARD.halfHeight,
+    }),
+    [],
+  );
+
   const getEdgePath = useCallback(
     (edge: Edge) => {
       const source = nodes.find((n) => n.id === edge.source);
       const target = nodes.find((n) => n.id === edge.target);
       if (!source || !target) return "";
-
-      const dx = target.x - source.x;
-      const dy = target.y - source.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist === 0) return "";
-
-      const nodeRadius = 36;
-      const sourceX = source.x + (dx / dist) * nodeRadius;
-      const sourceY = source.y + (dy / dist) * nodeRadius;
-      const targetX = target.x - (dx / dist) * (nodeRadius + 8);
-      const targetY = target.y - (dy / dist) * (nodeRadius + 8);
-
-      const midX = (sourceX + targetX) / 2;
-      const midY = (sourceY + targetY) / 2;
-      const offset = dist * 0.1;
-      const perpX = -dy / dist;
-      const perpY = dx / dist;
-
-      return `M ${sourceX} ${sourceY} Q ${midX + perpX * offset} ${midY + perpY * offset} ${targetX} ${targetY}`;
+      return generateEdgePath(source, target, edgePathOpts);
     },
-    [nodes],
+    [nodes, edgePathOpts],
   );
 
   // Keyboard shortcuts
@@ -462,21 +499,74 @@ export function TurborepoGraphVisual({
     ? nodes.find((n) => n.id === selectedNode)
     : null;
 
+  const selectedPackageMeta = useMemo(() => {
+    if (!selectedNode) return null;
+    const app = apps.find((a) => a.name === selectedNode);
+    if (app) return { path: app.path, kind: "app" as const };
+    const pkg = packages.find((p) => p.name === selectedNode);
+    if (pkg) return { path: pkg.path, kind: "package" as const };
+    return null;
+  }, [selectedNode, apps, packages]);
+
+  const selectedEdgeLists = useMemo(() => {
+    if (!selectedNode) {
+      return { outgoing: [] as Edge[], incoming: [] as Edge[] };
+    }
+    return {
+      outgoing: edges.filter((e) => e.source === selectedNode),
+      incoming: edges.filter((e) => e.target === selectedNode),
+    };
+  }, [selectedNode, edges]);
+
+  const githubHref =
+    github && selectedPackageMeta
+      ? githubTreeUrl(github, selectedPackageMeta.path)
+      : null;
+
   return (
     <div
       ref={containerRef}
       className={cn(
-        "relative flex flex-col overflow-hidden h-full",
+        "relative flex h-full flex-col overflow-hidden rounded-none",
         className,
         isFullscreen && "h-screen w-screen rounded-none",
       )}
     >
       {/* Header with controls */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
+      <div className="flex items-center justify-between border-b border-border bg-card px-2 py-1.5">
         <div className="flex items-center gap-3">
-          <h3 className="text-sm font-semibold text-foreground">
-            Dependency Graph
-          </h3>
+          <div
+            className="flex items-center gap-0.5 rounded-md border border-border p-0.5"
+            role="group"
+            aria-label="Graph column order"
+          >
+            <button
+              type="button"
+              title="Entry packages on the left, dependencies to the right"
+              onClick={() => setLayerOrder("roots-first")}
+              className={cn(
+                "rounded px-2 py-1 text-xs transition-colors",
+                layerOrder === "roots-first"
+                  ? "bg-secondary font-medium text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Roots
+            </button>
+            <button
+              type="button"
+              title="Workspace leaves on the left, dependents to the right"
+              onClick={() => setLayerOrder("leaves-first")}
+              className={cn(
+                "rounded px-2 py-1 text-xs transition-colors",
+                layerOrder === "leaves-first"
+                  ? "bg-secondary font-medium text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Leaves
+            </button>
+          </div>
           <span className="rounded-md bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
             {nodes.length} packages
           </span>
@@ -510,32 +600,32 @@ export function TurborepoGraphVisual({
           >
             {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
-          <div className="mx-2 h-4 w-px bg-border" />
+          <div className="ml-2 h-4 w-px bg-border" />
           <span className="text-xs text-muted-foreground">
             {Math.round(zoom * 100)}%
           </span>
         </div>
       </div>
 
-      {/* Graph canvas */}
-      <div className="relative flex-1 min-h-0">
-        <svg
-          ref={svgRef}
-          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-          className={cn(
-            "absolute inset-0 w-full h-full",
-            isPanning
-              ? "cursor-grabbing"
-              : draggedNode
-                ? "cursor-move"
-                : "cursor-grab",
-          )}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
-        >
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="relative min-h-0 flex-1">
+            <svg
+              ref={svgRef}
+              viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+              className={cn(
+                "absolute inset-0 h-full w-full",
+                isPanning
+                  ? "cursor-grabbing"
+                  : draggedNode
+                    ? "cursor-move"
+                    : "cursor-grab",
+              )}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onWheel={handleWheel}
+            >
           {/* Background pattern */}
           <defs>
             <pattern
@@ -550,10 +640,10 @@ export function TurborepoGraphVisual({
             <marker
               id="arrow-dependency"
               viewBox="0 0 10 10"
-              refX="10"
+              refX="9"
               refY="5"
-              markerWidth="6"
-              markerHeight="6"
+              markerWidth="5"
+              markerHeight="5"
               orient="auto"
             >
               <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.dependency} />
@@ -561,22 +651,14 @@ export function TurborepoGraphVisual({
             <marker
               id="arrow-devDependency"
               viewBox="0 0 10 10"
-              refX="10"
+              refX="9"
               refY="5"
-              markerWidth="6"
-              markerHeight="6"
+              markerWidth="5"
+              markerHeight="5"
               orient="auto"
             >
               <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.devDependency} />
             </marker>
-            {/* Glow filter */}
-            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
           </defs>
 
           {/* Grid background */}
@@ -589,26 +671,34 @@ export function TurborepoGraphVisual({
             fill="url(#grid)"
           />
 
-          {/* Edges */}
+          {/* Edges — opacity on <g> so stroke AND marker-end arrows dim together (markers ignore path strokeOpacity). */}
           <g className="edges">
             {edges.map((edge) => {
               const isConnected = connectedEdges.has(edge.id);
               const hasSelection = selectedNode || hoveredNode;
               const isDragging = !!draggedNode;
+              const edgeOpacity = hasSelection
+                ? isConnected
+                  ? 1
+                  : 0.02
+                : 0.6;
               return (
-                <path
+                <g
                   key={edge.id}
-                  d={getEdgePath(edge)}
-                  fill="none"
-                  stroke={edgeColors[edge.type]}
-                  strokeWidth={isConnected ? 2.5 : 1.5}
-                  strokeOpacity={hasSelection ? (isConnected ? 1 : 0.15) : 0.6}
-                  strokeDasharray={
-                    edge.type === "devDependency" ? "6 4" : "none"
-                  }
-                  markerEnd={`url(#arrow-${edge.type})`}
-                  className={isDragging ? "" : "transition-all duration-200"}
-                />
+                  opacity={edgeOpacity}
+                  className={isDragging ? "" : "transition-opacity duration-200"}
+                >
+                  <path
+                    d={getEdgePath(edge)}
+                    fill="none"
+                    stroke={edgeColors[edge.type]}
+                    strokeWidth={1}
+                    strokeDasharray={
+                      edge.type === "devDependency" ? "6 4" : "none"
+                    }
+                    markerEnd={`url(#arrow-${edge.type})`}
+                  />
+                </g>
               );
             })}
           </g>
@@ -621,6 +711,17 @@ export function TurborepoGraphVisual({
               const isConnected = connectedNodes.has(node.id);
               const hasSelection = selectedNode || hoveredNode;
               const colors = nodeColors[node.type];
+              const { primary, secondary } = formatNodeLabel(node.name);
+              const hw = GRAPH_NODE_CARD.halfWidth;
+              const hh = GRAPH_NODE_CARD.halfHeight;
+              const isDimmed = !!(hasSelection && !isConnected);
+              const shellOpacity = isDimmed ? 0.12 : 1;
+              const labelOpacity = isDimmed ? 0.28 : 1;
+
+              const meta = `${node.dependencies}d / ${node.dependents}r`;
+              const subRaw = [secondary, meta].filter(Boolean).join(" · ");
+              const subline =
+                subRaw.length > 46 ? `${subRaw.slice(0, 44)}…` : subRaw;
 
               return (
                 <g
@@ -631,190 +732,253 @@ export function TurborepoGraphVisual({
                   onMouseEnter={() => setHoveredNode(node.id)}
                   onMouseLeave={() => setHoveredNode(null)}
                   className="cursor-pointer"
-                  style={{
-                    opacity: hasSelection && !isConnected ? 0.25 : 1,
-                    transition: "opacity 0.2s ease",
-                  }}
-                  filter={isSelected || isHovered ? "url(#glow)" : undefined}
                 >
-                  {/* Node circle */}
-                  <circle
-                    r={isSelected ? 40 : isHovered ? 38 : 36}
-                    fill={colors.fill}
-                    stroke={isSelected ? "oklch(0.95 0 0)" : colors.stroke}
-                    strokeWidth={isSelected ? 3 : 2}
-                    className="transition-all duration-150"
-                  />
-
-                  {/* Inner ring */}
-                  <circle
-                    r={28}
-                    fill="none"
-                    stroke="oklch(0.95 0 0 / 0.15)"
-                    strokeWidth={1}
-                  />
-
-                  {/* Icon */}
-                  <foreignObject
-                    x={-7}
-                    y={-18}
-                    width={14}
-                    height={14}
-                    className="pointer-events-none"
+                  <title>{node.name}</title>
+                  <g
+                    style={{
+                      opacity: shellOpacity,
+                      transition: "opacity 0.2s ease",
+                    }}
                   >
-                    <div className="flex h-full items-center justify-center text-foreground/90">
-                      <NodeIcon type={node.type} />
-                    </div>
-                  </foreignObject>
+                    <rect
+                      x={-hw}
+                      y={-hh}
+                      width={GRAPH_NODE_CARD.width}
+                      height={GRAPH_NODE_CARD.height}
+                      rx={GRAPH_NODE_CARD.rx}
+                      ry={GRAPH_NODE_CARD.rx}
+                      fill={colors.fill}
+                      stroke={
+                        isSelected
+                          ? "oklch(0.96 0 0 / 0.85)"
+                          : isHovered
+                            ? "oklch(0.96 0 0 / 0.35)"
+                            : colors.stroke
+                      }
+                      strokeWidth={isSelected ? 1.5 : 1}
+                      className="transition-all duration-150"
+                    />
+                  </g>
 
-                  {/* Label */}
-                  <text
-                    textAnchor="middle"
-                    y={4}
-                    fill="oklch(0.95 0 0)"
-                    fontSize="10"
-                    fontWeight="600"
-                    fontFamily="system-ui, sans-serif"
-                    className="pointer-events-none select-none"
+                  <g
+                    style={{
+                      opacity: labelOpacity,
+                      transition: "opacity 0.2s ease",
+                    }}
                   >
-                    {node.name.split("/").pop()?.substring(0, 12) ||
-                      node.name.substring(0, 12)}
-                  </text>
+                    <text
+                      textAnchor="middle"
+                      y={-2}
+                      fill="oklch(0.97 0 0)"
+                      fontSize="12"
+                      fontWeight="600"
+                      fontFamily="ui-sans-serif, system-ui, sans-serif"
+                      className="pointer-events-none select-none"
+                    >
+                      {primary}
+                    </text>
 
-                  {/* Stats */}
-                  <text
-                    textAnchor="middle"
-                    y={17}
-                    fill="oklch(0.95 0 0 / 0.6)"
-                    fontSize="8"
-                    fontFamily="system-ui, sans-serif"
-                    className="pointer-events-none select-none"
-                  >
-                    {node.dependencies}d / {node.dependents}r
-                  </text>
+                    <text
+                      textAnchor="middle"
+                      y={11}
+                      fill="oklch(0.82 0 0)"
+                      fontSize="9.5"
+                      fontFamily="ui-sans-serif, system-ui, sans-serif"
+                      className="pointer-events-none select-none"
+                    >
+                      {subline}
+                    </text>
+                  </g>
                 </g>
               );
             })}
           </g>
         </svg>
 
-        {/* Instructions overlay */}
-        <div className="absolute bottom-4 left-4 flex items-center gap-4 rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
-          <div className="flex items-center gap-1.5">
-            <MousePointer2 size={12} />
-            <span>Click to select</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Move size={12} />
-            <span>Drag to move</span>
-          </div>
-          <div className="h-3 w-px bg-border" />
-          <span>Scroll to zoom</span>
-        </div>
-
-        {/* Selected node details */}
-        {selectedNodeData && (
-          <div className="absolute right-4 top-4 w-64 rounded-lg border border-border bg-card p-4 shadow-lg">
-            <div className="mb-3 flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="flex h-6 w-6 items-center justify-center rounded-md"
-                    style={{
-                      backgroundColor: nodeColors[selectedNodeData.type].fill,
-                    }}
+            {selectedNodeData ? (
+              <aside className="absolute inset-y-0 right-0 z-20 flex w-80 flex-col overflow-hidden border-l border-border bg-card shadow-lg">
+                <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+                  <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Details
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNode(null)}
+                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    aria-label="Close selection"
                   >
-                    <NodeIcon type={selectedNodeData.type} />
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    <div
+                      className="mt-0.5 h-9 w-9 shrink-0 rounded-md"
+                      style={{
+                        backgroundColor: nodeColors[selectedNodeData.type].fill,
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold leading-tight text-foreground">
+                        {selectedNodeData.name.split("/").pop()}
+                      </p>
+                      <p className="mt-1.5 break-all font-mono text-xs leading-snug text-muted-foreground">
+                        {selectedNodeData.name}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-sm font-semibold text-foreground">
-                    {selectedNodeData.name.split("/").pop()}
+
+                  <div className="mt-4">
+                    <span
+                      className="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium capitalize"
+                      style={{
+                        backgroundColor: `color-mix(in oklch, ${nodeColors[selectedNodeData.type].fill}, transparent 82%)`,
+                        color: nodeColors[selectedNodeData.type].fill,
+                      }}
+                    >
+                      {selectedNodeData.type}
+                    </span>
+                  </div>
+
+                  {selectedPackageMeta ? (
+                    <div className="mt-5 space-y-1.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Monorepo path
+                      </p>
+                      <code className="block rounded-md bg-secondary px-2.5 py-2 text-xs text-foreground">
+                        {selectedPackageMeta.path}
+                      </code>
+                    </div>
+                  ) : null}
+
+                  {githubHref ? (
+                    <a
+                      href={githubHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+                    >
+                      <Github size={16} />
+                      Open on GitHub
+                    </a>
+                  ) : null}
+
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-secondary/80 px-3 py-3">
+                      <div className="text-xl font-semibold tabular-nums text-foreground">
+                        {selectedNodeData.dependencies}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Dependencies
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-secondary/80 px-3 py-3">
+                      <div className="text-xl font-semibold tabular-nums text-foreground">
+                        {selectedNodeData.dependents}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Dependents</div>
+                    </div>
+                  </div>
+
+                  {(selectedEdgeLists.outgoing.length > 0 ||
+                    selectedEdgeLists.incoming.length > 0) && (
+                    <div className="mt-6 space-y-5 border-t border-border pt-6">
+                      {selectedEdgeLists.outgoing.length > 0 ? (
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Depends on
+                          </p>
+                          <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
+                            {selectedEdgeLists.outgoing.map((e) => (
+                              <li
+                                key={e.id}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span className="truncate font-mono text-xs text-foreground">
+                                  {e.target}
+                                </span>
+                                <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
+                                  {e.type === "devDependency" ? "dev" : "prod"}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {selectedEdgeLists.incoming.length > 0 ? (
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            Depended on by
+                          </p>
+                          <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
+                            {selectedEdgeLists.incoming.map((e) => (
+                              <li
+                                key={e.id}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span className="truncate font-mono text-xs text-foreground">
+                                  {e.source}
+                                </span>
+                                <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
+                                  {e.type === "devDependency" ? "dev" : "prod"}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              </aside>
+            ) : null}
+          </div>
+
+          {/* Legend */}
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border bg-card px-2 py-2">
+            <div className="flex items-center gap-6">
+              <span className="text-xs font-medium text-muted-foreground">
+                Nodes
+              </span>
+              {(["app", "package"] as const).map((type) => (
+                <div key={type} className="flex items-center gap-2">
+                  <div
+                    className="h-3.5 w-3.5 shrink-0 rounded-sm"
+                    style={{ backgroundColor: nodeColors[type].fill }}
+                    title={type}
+                  />
+                  <span className="text-xs capitalize text-muted-foreground">
+                    {type === "app" ? "Application" : "Package"}
                   </span>
                 </div>
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  {selectedNodeData.name}
+              ))}
+            </div>
+            <div className="flex items-center gap-6">
+              <span className="text-xs font-medium text-muted-foreground">
+                Edges
+              </span>
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-0.5 w-5 rounded-full"
+                  style={{ backgroundColor: edgeColors.dependency }}
+                />
+                <span className="text-xs text-muted-foreground">
+                  Dependency
                 </span>
               </div>
-              <button
-                onClick={() => setSelectedNode(null)}
-                className="rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              >
-                <RotateCcw size={14} />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-md bg-secondary p-2">
-                <div className="text-lg font-semibold text-foreground">
-                  {selectedNodeData.dependencies}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Dependencies
-                </div>
-              </div>
-              <div className="rounded-md bg-secondary p-2">
-                <div className="text-lg font-semibold text-foreground">
-                  {selectedNodeData.dependents}
-                </div>
-                <div className="text-xs text-muted-foreground">Dependents</div>
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-0.5 w-5 rounded-full"
+                  style={{
+                    backgroundColor: edgeColors.devDependency,
+                    backgroundImage:
+                      "repeating-linear-gradient(90deg, transparent, transparent 3px, oklch(0.09 0 0) 3px, oklch(0.09 0 0) 5px)",
+                  }}
+                />
+                <span className="text-xs text-muted-foreground">Dev</span>
               </div>
             </div>
-            <div className="mt-3 flex items-center gap-2">
-              <span
-                className="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-                style={{
-                  backgroundColor: `color-mix(in oklch, ${nodeColors[selectedNodeData.type].fill}, transparent 80%)`,
-                  color: nodeColors[selectedNodeData.type].fill,
-                }}
-              >
-                {selectedNodeData.type}
-              </span>
-            </div>
           </div>
-        )}
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center justify-between border-t border-border bg-card px-4 py-3">
-        <div className="flex items-center gap-6">
-          <span className="text-xs font-medium text-muted-foreground">
-            Nodes
-          </span>
-          {(["app", "package"] as const).map((type) => (
-            <div key={type} className="flex items-center gap-2">
-              <div
-                className="flex h-5 w-5 items-center justify-center rounded-full"
-                style={{ backgroundColor: nodeColors[type].fill }}
-              >
-                <NodeIcon type={type} />
-              </div>
-              <span className="text-xs capitalize text-muted-foreground">
-                {type === "app" ? "Application" : "Package"}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-6">
-          <span className="text-xs font-medium text-muted-foreground">
-            Edges
-          </span>
-          <div className="flex items-center gap-2">
-            <div
-              className="h-0.5 w-5 rounded-full"
-              style={{ backgroundColor: edgeColors.dependency }}
-            />
-            <span className="text-xs text-muted-foreground">Dependency</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="h-0.5 w-5 rounded-full"
-              style={{
-                backgroundColor: edgeColors.devDependency,
-                backgroundImage:
-                  "repeating-linear-gradient(90deg, transparent, transparent 3px, oklch(0.09 0 0) 3px, oklch(0.09 0 0) 5px)",
-              }}
-            />
-            <span className="text-xs text-muted-foreground">Dev</span>
-          </div>
-        </div>
       </div>
     </div>
   );

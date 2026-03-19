@@ -81,9 +81,8 @@ export default function RepositoryPage() {
                 <div key={i} className="flex items-center gap-2">
                   <div className="h-4 w-4 rounded bg-zinc-200 dark:bg-zinc-700 animate-pulse flex-shrink-0" />
                   <div
-                    className={`h-3.5 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse ${
-                      i % 3 === 0 ? "w-3/4" : i % 3 === 1 ? "w-1/2" : "w-2/3"
-                    }`}
+                    className={`h-3.5 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse ${i % 3 === 0 ? "w-3/4" : i % 3 === 1 ? "w-1/2" : "w-2/3"
+                      }`}
                   />
                 </div>
               ))}
@@ -93,9 +92,8 @@ export default function RepositoryPage() {
               {Array.from({ length: 12 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`h-3 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse ${
-                    i % 4 === 0 ? "w-full" : i % 4 === 1 ? "w-5/6" : i % 4 === 2 ? "w-3/4" : "w-2/3"
-                  }`}
+                  className={`h-3 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse ${i % 4 === 0 ? "w-full" : i % 4 === 1 ? "w-5/6" : i % 4 === 2 ? "w-3/4" : "w-2/3"
+                    }`}
                 />
               ))}
             </div>
@@ -193,6 +191,9 @@ export default function RepositoryPage() {
               affectedPackages={affectedPackages}
               downstreamDependents={downstreamDependents}
               onImpactChange={handleImpactChange}
+              owner={owner}
+              repo={repo}
+              branch={branch}
             />
           )}
 
@@ -201,6 +202,9 @@ export default function RepositoryPage() {
               turborepoStructure={turborepoStructure}
               turborepoLoading={turborepoLoading}
               dependencyGraph={dependencyGraph}
+              owner={owner}
+              repo={repo}
+              branch={branch}
             />
           )}
 

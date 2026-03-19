@@ -2,8 +2,14 @@
  * Color definitions for graph nodes by type
  */
 export const nodeColors = {
-  app: { fill: "oklch(0.65 0.18 265)", stroke: "oklch(0.55 0.2 265)" },
-  package: { fill: "oklch(0.7 0.16 180)", stroke: "oklch(0.6 0.18 180)" },
+  app: {
+    fill: "oklch(0.52 0.1 265)",
+    stroke: "oklch(0.35 0.08 265 / 0.45)",
+  },
+  package: {
+    fill: "oklch(0.55 0.09 180)",
+    stroke: "oklch(0.38 0.08 180 / 0.45)",
+  },
 } as const;
 
 /**
@@ -18,8 +24,8 @@ export const edgeColors = {
  * Fallback hex colors for environments that don't support oklch
  */
 export const nodeColorsHex = {
-  app: { fill: "#7c3aed", stroke: "#6d28d9" },
-  package: { fill: "#14b8a6", stroke: "#0d9488" },
+  app: { fill: "#4c4d78", stroke: "rgba(30,28,55,0.45)" },
+  package: { fill: "#2f6f66", stroke: "rgba(22,55,50,0.45)" },
 } as const;
 
 export const edgeColorsHex = {

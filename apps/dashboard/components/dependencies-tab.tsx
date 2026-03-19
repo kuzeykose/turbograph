@@ -6,12 +6,18 @@ interface DependenciesTabProps {
   turborepoStructure: TurborepoStructure;
   turborepoLoading: boolean;
   dependencyGraph: DependencyEdge[];
+  owner: string;
+  repo: string;
+  branch?: string | null;
 }
 
 export function DependenciesTab({
   turborepoStructure,
   turborepoLoading,
   dependencyGraph,
+  owner,
+  repo,
+  branch,
 }: DependenciesTabProps) {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -40,6 +46,7 @@ export function DependenciesTab({
                 apps={turborepoStructure.apps}
                 packages={turborepoStructure.packages}
                 dependencies={dependencyGraph}
+                github={{ owner, repo, branch }}
               />
             </div>
           )}
