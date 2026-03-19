@@ -10,9 +10,8 @@ export interface RepositoryWithTurbo extends GitHubRepository {
 }
 
 async function fetchRepositories(): Promise<RepositoryWithTurbo[]> {
-  const repos = await githubService.getUserRepositories({
+  const repos = await githubService.getAccessibleRepositories({
     sort: "updated",
-    perPage: 100,
   });
 
   const repositoriesToCheck = repos.map((repo) => {
