@@ -108,11 +108,11 @@ export function TurborepoGraphVisual({
   // Initialize nodes and edges with hierarchical layout
   useEffect(() => {
     // Use shared layout calculation from @workspace/graph
-    const { nodes: layoutNodes, edges: layoutEdges } = calculateGraphLayout(
+    const { nodes: layoutNodes, edges: layoutEdges, width, height } = calculateGraphLayout(
       apps,
       packages,
       dependencies,
-      { width: 900, height: 550, padding: 80 }
+      { padding: 80 }
     );
 
     // Extend graph nodes with velocity properties for force simulation
@@ -124,6 +124,7 @@ export function TurborepoGraphVisual({
 
     setNodes(newNodes);
     setEdges(layoutEdges);
+    setViewBox((prev) => ({ ...prev, width, height }));
   }, [apps, packages, dependencies]);
 
   // Apply force simulation
@@ -157,19 +158,17 @@ export function TurborepoGraphVisual({
             }
           });
 
-          const fixedHeight = 550;
-          fy += (fixedHeight / 2 - node.y) * 0.002;
+          fy += (viewBox.height / 2 - node.y) * 0.002;
 
           const damping = 0.7;
           const newVx = (node.vx + fx) * damping;
           const newVy = (node.vy + fy) * damping;
 
-          const fixedWidth = 900;
           const newX = Math.max(
             50,
-            Math.min(fixedWidth - 50, node.x + newVx * 0.3),
+            Math.min(viewBox.width - 50, node.x + newVx * 0.3),
           );
-          const newY = Math.max(50, Math.min(fixedHeight - 50, node.y + newVy));
+          const newY = Math.max(50, Math.min(viewBox.height - 50, node.y + newVy));
 
           return { ...node, x: newX, y: newY, vx: newVx, vy: newVy };
         });

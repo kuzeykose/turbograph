@@ -113,9 +113,7 @@ export function calculateGraphLayout(
   packages: PackageInfo[],
   dependencies: DependencyEdge[],
   options?: LayoutOptions
-): { nodes: GraphNode[]; edges: GraphEdge[] } {
-  const width = options?.width ?? DEFAULT_WIDTH;
-  const height = options?.height ?? DEFAULT_HEIGHT;
+): { nodes: GraphNode[]; edges: GraphEdge[]; width: number; height: number } {
   const padding = options?.padding ?? DEFAULT_PADDING;
 
   // Create edges
@@ -203,6 +201,23 @@ export function calculateGraphLayout(
   });
 
   const maxDepth = Math.max(...nodeDepth.values(), 0);
+  const maxNodesAtAnyDepth = Math.max(
+    ...Array.from(nodesByDepth.values()).map((nodes) => nodes.length),
+    1
+  );
+
+  // Dynamic canvas sizing: ensure enough space for nodes
+  const minLevelWidth = 160;
+  const minNodeSpacing = 100;
+  const width = Math.max(
+    options?.width ?? DEFAULT_WIDTH,
+    maxDepth * minLevelWidth + 2 * padding
+  );
+  const height = Math.max(
+    options?.height ?? DEFAULT_HEIGHT,
+    maxNodesAtAnyDepth * minNodeSpacing + 2 * padding
+  );
+
   const levelWidth = (width - 2 * padding) / Math.max(1, maxDepth);
 
   // Create nodes with hierarchical positions
@@ -230,7 +245,7 @@ export function calculateGraphLayout(
     });
   });
 
-  return { nodes: graphNodes, edges: graphEdges };
+  return { nodes: graphNodes, edges: graphEdges, width, height };
 }
 
 /**
