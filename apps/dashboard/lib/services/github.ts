@@ -6,6 +6,8 @@ import {
   GitHubCommitDetail,
   GitHubAPIError,
   GitHubRateLimitError,
+  GitHubInstallation,
+  GitHubInstallationRepositoriesResponse,
   GetContentsOptions,
   GetBranchesOptions,
   GetCommitsOptions,
@@ -243,6 +245,82 @@ class GitHubService {
 
     const response = await this.request(endpoint);
     return await response.json();
+  }
+
+  /**
+   * Get the user's GitHub App installations.
+   * Returns installations of the TurboGraph app for the authenticated user.
+   */
+  async getUserInstallations(): Promise<GitHubInstallation[]> {
+    await this.ensureAuthenticated();
+
+    const response = await this.request("/user/installations");
+    const data = await response.json();
+    return data.installations || [];
+  }
+
+  /**
+   * Get repositories accessible through a specific GitHub App installation.
+   * Handles pagination to fetch all repositories.
+   */
+  async getInstallationRepositories(
+    installationId: number,
+    options?: { sort?: string; perPage?: number },
+  ): Promise<GitHubRepository[]> {
+    await this.ensureAuthenticated();
+
+    const allRepos: GitHubRepository[] = [];
+    let page = 1;
+    const perPage = options?.perPage || 100;
+
+    while (true) {
+      const params = new URLSearchParams();
+      params.append("per_page", perPage.toString());
+      params.append("page", page.toString());
+
+      const response = await this.request(
+        `/user/installations/${installationId}/repositories?${params.toString()}`,
+      );
+      const data: GitHubInstallationRepositoriesResponse =
+        await response.json();
+
+      allRepos.push(...data.repositories);
+
+      if (allRepos.length >= data.total_count) break;
+      page++;
+    }
+
+    return allRepos;
+  }
+
+  /**
+   * Get all repositories the user has granted access to via GitHub App installations.
+   * Aggregates repos across all installations.
+   */
+  async getAccessibleRepositories(
+    options?: { sort?: string },
+  ): Promise<GitHubRepository[]> {
+    const installations = await this.getUserInstallations();
+
+    if (installations.length === 0) {
+      return [];
+    }
+
+    const allRepos: GitHubRepository[] = [];
+
+    for (const installation of installations) {
+      const repos = await this.getInstallationRepositories(installation.id);
+      allRepos.push(...repos);
+    }
+
+    if (options?.sort === "updated") {
+      allRepos.sort(
+        (a, b) =>
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+      );
+    }
+
+    return allRepos;
   }
 
   /**
