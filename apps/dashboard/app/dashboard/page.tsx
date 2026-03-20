@@ -183,9 +183,18 @@ export default function DashboardPage() {
                 All ({repositories.length})
               </button>
             </div>
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">
-              {filteredRepositories.length} {filteredRepositories.length === 1 ? "repository" : "repositories"}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                {filteredRepositories.length} {filteredRepositories.length === 1 ? "repository" : "repositories"}
+              </span>
+              <a
+                href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+              >
+                Manage
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </div>
         )}
 
