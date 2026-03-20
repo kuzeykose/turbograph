@@ -9,10 +9,25 @@ export interface RepositoryWithTurbo extends GitHubRepository {
   isTurborepo: boolean;
 }
 
-async function fetchRepositories(): Promise<RepositoryWithTurbo[]> {
+interface RepositoriesResult {
+  repositories: RepositoryWithTurbo[];
+  needsInstallation: boolean;
+}
+
+async function fetchRepositories(): Promise<RepositoriesResult> {
+  const installations = await githubService.getUserInstallations();
+
+  if (installations.length === 0) {
+    return { repositories: [], needsInstallation: true };
+  }
+
   const repos = await githubService.getAccessibleRepositories({
     sort: "updated",
   });
+
+  if (repos.length === 0) {
+    return { repositories: [], needsInstallation: false };
+  }
 
   const repositoriesToCheck = repos.map((repo) => {
     const [owner, name] = repo.full_name.split("/");
@@ -22,18 +37,26 @@ async function fetchRepositories(): Promise<RepositoryWithTurbo[]> {
   const turborepoResults =
     await githubService.batchCheckTurboJson(repositoriesToCheck);
 
-  return repos.map((repo) => ({
+  const repositories = repos.map((repo) => ({
     ...repo,
     isTurborepo: turborepoResults.get(repo.full_name) || false,
   }));
+
+  return { repositories, needsInstallation: false };
 }
 
 export function useRepositoriesQuery(enabled = true) {
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.repositories.userRepos(),
     queryFn: fetchRepositories,
     enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 15 * 60 * 1000, // 15 minutes
   });
+
+  return {
+    ...query,
+    repositories: query.data?.repositories ?? [],
+    needsInstallation: query.data?.needsInstallation ?? false,
+  };
 }
