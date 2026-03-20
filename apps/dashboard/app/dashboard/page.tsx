@@ -15,6 +15,7 @@ import {
   Archive,
   ArrowRight,
   ChevronRight,
+  Github,
 } from "@workspace/ui/icons";
 
 type FilterMode = "turborepo" | "all";
@@ -27,7 +28,8 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState<FilterMode>("turborepo");
 
   const {
-    data: repositories = [],
+    repositories,
+    needsInstallation,
     isLoading: loading,
     error: queryError,
   } = useRepositoriesQuery(!!user && !authLoading);
@@ -291,23 +293,42 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Empty: no repos at all */}
-        {!loading && !error && repositories.length === 0 && (
+        {/* Needs GitHub App installation */}
+        {!loading && !error && needsInstallation && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Github className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
+            <p className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              Connect your repositories
+            </p>
+            <p className="mt-1 max-w-sm text-xs text-zinc-400 dark:text-zinc-500">
+              Install the TurboGraph app on your GitHub account to select which repositories you&apos;d like to access. Only read-only permissions are required.
+            </p>
+            <a
+              href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-medium text-zinc-900 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-700"
+            >
+              <Github className="h-3.5 w-3.5" />
+              Install GitHub App
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        )}
+
+        {/* Empty: no repos at all (app installed but no repos selected) */}
+        {!loading && !error && !needsInstallation && repositories.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Archive className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
             <p className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
               No repositories found
             </p>
             <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-              You don&apos;t have any repositories yet.
+              No repositories are selected. Update your GitHub App settings to add repositories.
             </p>
             <a
-              href="https://github.com/new"
-              target="_blank"
-              rel="noopener noreferrer"
+              href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
               className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-900 underline underline-offset-2 hover:no-underline dark:text-zinc-100"
             >
-              Create on GitHub
+              Configure repositories
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
