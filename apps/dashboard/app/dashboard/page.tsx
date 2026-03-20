@@ -133,11 +133,14 @@ export default function DashboardPage() {
   return (
     <main className="flex-1 overflow-auto">
       <div className="mx-auto max-w-5xl px-6 py-6">
-        {/* Search bar */}
+        {/* Open any public repo */}
         <form
           onSubmit={handlePublicRepoSubmit}
-          className="mb-6"
+          className="mb-8"
         >
+          <label className="mb-2 block text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            Open any public repository
+          </label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
             <input
@@ -147,7 +150,7 @@ export default function DashboardPage() {
                 setRepoUrl(e.target.value);
                 setUrlError(null);
               }}
-              placeholder="Search a public repository... owner/repo"
+              placeholder="owner/repo or https://github.com/owner/repo"
               className="w-full rounded-lg border border-zinc-200 bg-white py-2.5 pl-10 pr-4 text-sm text-zinc-900 placeholder-zinc-400 outline-none transition-colors focus:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-600 dark:focus:border-zinc-600"
             />
           </div>
@@ -158,7 +161,7 @@ export default function DashboardPage() {
           )}
         </form>
 
-        {/* Filter tabs + count */}
+        {/* Your repositories - filter tabs + count */}
         {!loading && !error && repositories.length > 0 && (
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-900">
