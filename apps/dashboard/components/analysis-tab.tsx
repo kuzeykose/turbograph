@@ -1,12 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Markdown from "react-markdown";
 import { useAuth } from "@/contexts/auth-context";
-import { useAnalysis } from "@/hooks/use-analysis";
+import { useAnalysis, useFixPlan } from "@/hooks/use-analysis";
 import type { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { githubService } from "@/lib/services/github";
-import { Sparkles, AlertCircle, RefreshCw, Loader2, LogIn } from "@workspace/ui/icons";
+import {
+  Sparkles,
+  AlertCircle,
+  Loader2,
+  LogIn,
+  Wrench,
+  Copy,
+  Check,
+  X,
+  Pencil,
+  Eye,
+} from "@workspace/ui/icons";
+
+const proseClasses =
+  "prose prose-zinc dark:prose-invert prose-headings:font-semibold prose-h2:text-base prose-h2:mt-8 prose-h2:mb-3 prose-h3:text-sm prose-h3:mt-5 prose-h3:mb-2 prose-p:text-sm prose-p:leading-relaxed prose-li:text-sm prose-li:leading-relaxed prose-code:text-xs prose-code:before:content-none prose-code:after:content-none prose-pre:text-xs prose-pre:bg-zinc-100 prose-pre:dark:bg-zinc-800 prose-strong:font-semibold max-w-none";
 
 interface AnalysisTabProps {
   turborepoStructure: TurborepoStructure;
@@ -22,14 +37,41 @@ export function AnalysisTab({
   repo,
 }: AnalysisTabProps) {
   const { user } = useAuth();
-  const { analysis, isStreaming, error, runAnalysis, reset } = useAnalysis();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const { analysis, isStreaming, error, runAnalysis } = useAnalysis();
+  const { fixPlan, isFixStreaming, fixError, runFixPlan, resetFix } = useFixPlan();
+  const analysisRef = useRef<HTMLDivElement>(null);
+  const fixRef = useRef<HTMLDivElement>(null);
+
+  const [showFixPane, setShowFixPane] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [turboJsonCache, setTurboJsonCache] = useState<string | undefined>();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedFixPlan, setEditedFixPlan] = useState("");
 
   useEffect(() => {
-    if (isStreaming && contentRef.current) {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    if (isStreaming && analysisRef.current) {
+      analysisRef.current.scrollTop = analysisRef.current.scrollHeight;
     }
   }, [analysis, isStreaming]);
+
+  useEffect(() => {
+    if (isFixStreaming && fixRef.current) {
+      fixRef.current.scrollTop = fixRef.current.scrollHeight;
+    }
+  }, [fixPlan, isFixStreaming]);
+
+  useEffect(() => {
+    if (isFixStreaming) {
+      setIsEditing(false);
+      setEditedFixPlan(fixPlan);
+    }
+  }, [fixPlan, isFixStreaming]);
+
+  useEffect(() => {
+    if (!isFixStreaming && fixPlan) {
+      setEditedFixPlan(fixPlan);
+    }
+  }, [isFixStreaming, fixPlan]);
 
   if (!user) {
     return (
@@ -58,6 +100,9 @@ export function AnalysisTab({
   }
 
   const handleAnalyze = useCallback(async () => {
+    setShowFixPane(false);
+    resetFix();
+
     let turboJsonContent: string | undefined;
     try {
       const data = await githubService.getContents(owner, repo, "turbo.json");
@@ -68,13 +113,42 @@ export function AnalysisTab({
       // turbo.json fetch is best-effort
     }
 
+    setTurboJsonCache(turboJsonContent);
+
     runAnalysis({
       apps: turborepoStructure.apps,
       packages: turborepoStructure.packages,
       edges: dependencyGraph,
       turboJsonContent,
     });
-  }, [turborepoStructure, dependencyGraph, owner, repo, runAnalysis]);
+  }, [turborepoStructure, dependencyGraph, owner, repo, runAnalysis, resetFix]);
+
+  const handleFixSuggestions = useCallback(() => {
+    setShowFixPane(true);
+    setCopied(false);
+    setIsEditing(false);
+    setEditedFixPlan("");
+
+    runFixPlan({
+      analysisOutput: analysis,
+      apps: turborepoStructure.apps,
+      packages: turborepoStructure.packages,
+      edges: dependencyGraph,
+      turboJsonContent: turboJsonCache,
+    });
+  }, [analysis, turborepoStructure, dependencyGraph, turboJsonCache, runFixPlan]);
+
+  const handleCloseFixPane = useCallback(() => {
+    setShowFixPane(false);
+    setIsEditing(false);
+    resetFix();
+  }, [resetFix]);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(editedFixPlan);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [editedFixPlan]);
 
   const hasResult = analysis.length > 0 || error;
 
@@ -117,103 +191,158 @@ export function AnalysisTab({
             <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-600 dark:text-violet-400" />
           )}
         </div>
-        <button
-          onClick={handleAnalyze}
-          disabled={isStreaming}
-          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-        >
-          <RefreshCw className={`h-3 w-3 ${isStreaming ? "animate-spin" : ""}`} />
-          Re-analyze
-        </button>
+        {analysis && !isStreaming && (
+          <button
+            onClick={showFixPane ? handleCloseFixPane : handleFixSuggestions}
+            disabled={isFixStreaming}
+            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            {showFixPane ? (
+              <>
+                <X className="h-3 w-3" />
+                Close
+              </>
+            ) : (
+              <>
+                <Wrench className="h-3 w-3" />
+                Fix Suggestions
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Content */}
-      <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
-        {error && (
-          <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
-            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400" />
-            <div>
-              <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                Analysis failed
-              </p>
-              <p className="mt-1 text-xs text-red-700 dark:text-red-300">
-                {error}
-              </p>
+      <div className="flex-1 min-h-0 flex flex-row">
+        {/* Left pane: Analysis */}
+        <div
+          ref={analysisRef}
+          className={`min-h-0 overflow-y-auto ${showFixPane ? "w-1/2 border-r border-zinc-200 dark:border-zinc-800" : "flex-1"}`}
+        >
+          <div className={`px-6 py-6 ${showFixPane ? "" : "mx-auto max-w-3xl"}`}>
+            {error && (
+              <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400" />
+                <div>
+                  <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                    Analysis failed
+                  </p>
+                  <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+                    {error}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {analysis && (
+              <article className={proseClasses}>
+                <Markdown>{analysis}</Markdown>
+              </article>
+            )}
+
+            {isStreaming && !analysis && (
+              <div className="flex items-center justify-center gap-3 py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-violet-600 dark:text-violet-400" />
+                <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Analyzing your monorepo...
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right pane: Fix Plan */}
+        {showFixPane && (
+          <div className="w-1/2 min-h-0 flex flex-col">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <Wrench className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                  Fix Plan
+                </span>
+                {isFixStreaming && (
+                  <Loader2 className="h-3 w-3 animate-spin text-violet-600 dark:text-violet-400" />
+                )}
+              </div>
+              {fixPlan && !isFixStreaming && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    {isEditing ? (
+                      <>
+                        <Eye className="h-3 w-3" />
+                        Preview
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-3 w-3" />
+                        Edit
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCopy}
+                    className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+            {isEditing ? (
+              <textarea
+                value={editedFixPlan}
+                onChange={(e) => setEditedFixPlan(e.target.value)}
+                className="flex-1 min-h-0 resize-none bg-zinc-50 px-5 py-5 font-mono text-xs leading-relaxed text-zinc-800 outline-none dark:bg-zinc-900 dark:text-zinc-200"
+                spellCheck={false}
+              />
+            ) : (
+              <div ref={fixRef} className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
+                {fixError && (
+                  <div className="mb-4 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/30">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-red-600 dark:text-red-400" />
+                    <div>
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                        Fix plan generation failed
+                      </p>
+                      <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+                        {fixError}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-        {analysis && (
-          <div className="prose prose-sm prose-zinc max-w-none dark:prose-invert prose-headings:text-sm prose-headings:font-semibold prose-p:text-xs prose-p:leading-relaxed prose-li:text-xs prose-li:leading-relaxed prose-code:text-xs prose-pre:text-xs">
-            <MarkdownContent content={analysis} />
-          </div>
-        )}
+                {(isFixStreaming ? fixPlan : editedFixPlan) && (
+                  <article className={proseClasses}>
+                    <Markdown>{isFixStreaming ? fixPlan : editedFixPlan}</Markdown>
+                  </article>
+                )}
 
-        {isStreaming && !analysis && (
-          <div className="flex items-center gap-3 py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-violet-600 dark:text-violet-400" />
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">
-              Analyzing your monorepo...
-            </span>
+                {isFixStreaming && !fixPlan && (
+                  <div className="flex items-center justify-center gap-3 py-12">
+                    <Loader2 className="h-5 w-5 animate-spin text-violet-600 dark:text-violet-400" />
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      Generating fix plan...
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
-}
-
-function MarkdownContent({ content }: { content: string }) {
-  const html = markdownToHtml(content);
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
-}
-
-function markdownToHtml(md: string): string {
-  let html = md;
-
-  // Code blocks
-  html = html.replace(
-    /```(\w*)\n([\s\S]*?)```/g,
-    (_, lang, code) =>
-      `<pre><code class="language-${lang}">${escapeHtml(code.trim())}</code></pre>`,
-  );
-
-  // Inline code
-  html = html.replace(
-    /`([^`]+)`/g,
-    (_, code) => `<code>${escapeHtml(code)}</code>`,
-  );
-
-  // Headers
-  html = html.replace(/^#### (.+)$/gm, "<h4>$1</h4>");
-  html = html.replace(/^### (.+)$/gm, "<h3>$1</h3>");
-  html = html.replace(/^## (.+)$/gm, "<h2>$1</h2>");
-  html = html.replace(/^# (.+)$/gm, "<h1>$1</h1>");
-
-  // Bold and italic
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-  // Unordered lists
-  html = html.replace(/^- (.+)$/gm, "<li>$1</li>");
-  html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, "<ul>$1</ul>");
-
-  // Paragraphs (lines not already wrapped in block elements)
-  html = html.replace(
-    /^(?!<[hulop])((?!<).+)$/gm,
-    "<p>$1</p>",
-  );
-
-  // Clean up double newlines between block elements
-  html = html.replace(/\n{2,}/g, "\n");
-
-  return html;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

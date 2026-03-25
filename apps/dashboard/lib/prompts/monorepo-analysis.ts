@@ -1,6 +1,6 @@
 import type { PackageInfo, DependencyEdge } from "@workspace/graph";
 
-interface AnalysisInput {
+export interface AnalysisInput {
   apps: PackageInfo[];
   packages: PackageInfo[];
   edges: DependencyEdge[];
@@ -70,4 +70,82 @@ export function buildAnalysisPrompt(input: AnalysisInput): string {
   }
 
   return sections.join("\n\n");
+}
+
+export const FIX_SYSTEM_PROMPT = `You are a senior monorepo architect who creates step-by-step fix plans for Turborepo workspaces. Given an analysis of issues and the workspace structure, produce a concrete, ordered plan to resolve every issue.
+
+Format your response in markdown using this exact structure for each step:
+
+### Step N: [Short title]
+
+**Problem:** What is wrong and where.
+**Why it matters:** Impact on build, DX, or reliability.
+
+**Files to modify:**
+- \`path/to/file\` — what to change
+
+**Changes:**
+\`\`\`diff
+- old code or config
++ new code or config
+\`\`\`
+
+**Commands to run:**
+\`\`\`sh
+# any install, migration, or verification commands
+\`\`\`
+
+Rules:
+- Address every issue from the analysis — do not skip any.
+- Order steps by dependency: if step 2 depends on step 1, step 1 comes first.
+- Use exact file paths relative to the monorepo root.
+- Show diffs for config changes (package.json, turbo.json, tsconfig.json).
+- Show shell commands for dependency installs or migrations.
+- Flag breaking changes with a warning.
+- Keep each step focused on one issue — do not combine unrelated fixes.
+- Be specific with package names and file paths. Do not use placeholders.`;
+
+export function buildFixPrompt(
+  analysisOutput: string,
+  input: AnalysisInput,
+): string {
+  const { apps, packages, edges, turboJsonContent } = input;
+
+  const allPkgs = [...apps, ...packages];
+
+  const fileTree = allPkgs
+    .map((p) => {
+      const deps = Object.keys(p.dependencies);
+      const devDeps = Object.keys(p.devDependencies);
+      const allDeps = [...deps, ...devDeps.map((d) => `${d} (dev)`)];
+      return `- ${p.path}/package.json  [${p.name}]${allDeps.length > 0 ? `\n  deps: ${allDeps.join(", ")}` : ""}`;
+    })
+    .join("\n");
+
+  const edgeList =
+    edges.length > 0
+      ? edges.map((e) => `${e.from} → ${e.to} (${e.type})`).join("\n")
+      : "(none)";
+
+  const turboSection = turboJsonContent
+    ? `\n### turbo.json\n\`\`\`json\n${turboJsonContent}\n\`\`\`\n`
+    : "";
+
+  return `Fix the issues found in this Turborepo monorepo.
+
+## Analysis Results
+
+${analysisOutput}
+
+## Workspace Structure
+
+Apps: ${apps.length}, Packages: ${packages.length}
+
+${fileTree}
+
+## Internal Dependency Graph
+
+${edgeList}
+${turboSection}
+Generate the step-by-step fix plan now.`;
 }
