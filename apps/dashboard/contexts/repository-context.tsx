@@ -15,7 +15,7 @@ import {
 import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { Repository } from "@/types/repository";
 
-type TabValue = "files" | "commits" | "turborepo" | "packages";
+type TabValue = "files" | "commits" | "turborepo" | "packages" | "analysis";
 
 interface RepositoryContextType {
   // Route params
@@ -57,7 +57,7 @@ export function RepositoryProvider({
   // Tab state - read from URL or default to "files"
   const tabFromUrl = searchParams.get("tab") as TabValue | null;
   const [activeTab, setActiveTabState] = useState<TabValue>(
-    tabFromUrl && ["files", "commits", "turborepo", "packages"].includes(tabFromUrl)
+    tabFromUrl && ["files", "commits", "turborepo", "packages", "analysis"].includes(tabFromUrl)
       ? tabFromUrl
       : "turborepo"
   );
@@ -105,7 +105,7 @@ export function RepositoryProvider({
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab") as TabValue | null;
     const newTab =
-      tabFromUrl && ["files", "commits", "turborepo", "packages"].includes(tabFromUrl)
+      tabFromUrl && ["files", "commits", "turborepo", "packages", "analysis"].includes(tabFromUrl)
         ? tabFromUrl
         : "turborepo";
     setActiveTabState(newTab);
