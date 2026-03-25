@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRepositoryContext } from "@/contexts/repository-context";
-import { Clock, BarChart3, List, Menu } from "@workspace/ui/icons";
+import { Clock, BarChart3, List, Menu, Sparkles } from "@workspace/ui/icons";
 import { Button } from "@workspace/ui/components/button";
 import {
   Sheet,
@@ -13,7 +13,7 @@ import {
 } from "@workspace/ui/components/sheet";
 import { cn } from "@workspace/ui/lib/utils";
 
-type TabValue = "files" | "commits" | "turborepo" | "packages";
+type TabValue = "files" | "commits" | "turborepo" | "packages" | "analysis";
 
 interface NavItem {
   value: TabValue;
@@ -134,6 +134,11 @@ export function RepositorySidebar() {
           value: "packages" as const,
           label: "Packages",
           icon: <List className="h-4 w-4" />,
+        },
+        {
+          value: "analysis" as const,
+          label: "AI Analysis",
+          icon: <Sparkles className="h-4 w-4" />,
         },
       ]
       : []),

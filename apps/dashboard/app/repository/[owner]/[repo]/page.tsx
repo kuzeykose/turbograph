@@ -9,6 +9,7 @@ import { FilesTab } from "@/components/files-tab";
 import { CommitsTab } from "@/components/commits-tab";
 import { DependenciesTab } from "@/components/dependencies-tab";
 import { PackagesTab } from "@/components/packages-tab";
+import { AnalysisTab } from "@/components/analysis-tab";
 import { useFileNavigation } from "@/hooks/use-file-navigation";
 import { useCommitHistory } from "@/hooks/use-commit-history";
 import { useImpactAnalysis } from "@/hooks/use-impact-analysis";
@@ -213,6 +214,15 @@ export default function RepositoryPage() {
               turborepoStructure={turborepoStructure}
               turborepoLoading={turborepoLoading}
               dependencyGraph={dependencyGraph}
+            />
+          )}
+
+          {activeTab === "analysis" && turborepoStructure?.isTurborepo && (
+            <AnalysisTab
+              turborepoStructure={turborepoStructure}
+              dependencyGraph={dependencyGraph}
+              owner={owner}
+              repo={repo}
             />
           )}
         </div>
