@@ -248,11 +248,11 @@ export default function Home() {
           {/* Centered text */}
           <div className="max-w-2xl mx-auto text-center animate-fade-up">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-foreground leading-[1.08]">
-              Visualize your{" "}
+              Your{" "}
               <span className="animate-gradient-text bg-[length:200%_auto] bg-gradient-to-r from-violet-500 via-teal-400 to-violet-500 bg-clip-text text-transparent">
                 Turborepo
-              </span>{" "}
-              workspace
+              </span>
+              , explained.
             </h1>
 
             <p className="mt-5 text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
