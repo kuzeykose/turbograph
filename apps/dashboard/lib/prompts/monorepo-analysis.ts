@@ -5,6 +5,14 @@ export interface AnalysisInput {
   packages: PackageInfo[];
   edges: DependencyEdge[];
   turboJsonContent?: string;
+  /** Filename the config was read from ("turbo.json" or "turbo.jsonc"). */
+  turboConfigFile?: string;
+}
+
+/** Heading and fence language for the turbo config section of a prompt. */
+function turboConfigLabels(turboConfigFile?: string) {
+  const filename = turboConfigFile ?? "turbo.json";
+  return { filename, fence: filename.endsWith(".jsonc") ? "jsonc" : "json" };
 }
 
 export const SYSTEM_PROMPT = `You are a senior monorepo architect specializing in Turborepo workspaces. You analyze dependency graphs and workspace structures to provide concise, actionable feedback.
@@ -17,7 +25,7 @@ Analyze circular dependencies, coupling levels, orphaned packages, and dependenc
 Evaluate package boundaries, naming conventions, separation of concerns, and shared code organization.
 
 ## Turborepo Best Practices
-Review turbo.json configuration (if provided), caching strategy, pipeline definitions, and workspace setup.
+Review the turbo config (turbo.json or turbo.jsonc, if provided), caching strategy, pipeline definitions, and workspace setup.
 
 ## Summary
 A brief overall assessment with the top 3 priorities to address.
@@ -38,7 +46,7 @@ function formatPackage(pkg: PackageInfo): string {
 }
 
 export function buildAnalysisPrompt(input: AnalysisInput): string {
-  const { apps, packages, edges, turboJsonContent } = input;
+  const { apps, packages, edges, turboJsonContent, turboConfigFile } = input;
 
   const sections: string[] = [];
 
@@ -66,7 +74,10 @@ export function buildAnalysisPrompt(input: AnalysisInput): string {
   }
 
   if (turboJsonContent) {
-    sections.push(`## turbo.json\n\`\`\`json\n${turboJsonContent}\n\`\`\``);
+    const { filename, fence } = turboConfigLabels(turboConfigFile);
+    sections.push(
+      `## ${filename}\n\`\`\`${fence}\n${turboJsonContent}\n\`\`\``,
+    );
   }
 
   return sections.join("\n\n");
@@ -99,7 +110,7 @@ Rules:
 - Address every issue from the analysis — do not skip any.
 - Order steps by dependency: if step 2 depends on step 1, step 1 comes first.
 - Use exact file paths relative to the monorepo root.
-- Show diffs for config changes (package.json, turbo.json, tsconfig.json).
+- Show diffs for config changes (package.json, the turbo config, tsconfig.json). Use the exact turbo config filename shown in the workspace structure.
 - Show shell commands for dependency installs or migrations.
 - Flag breaking changes with a warning.
 - Keep each step focused on one issue — do not combine unrelated fixes.
@@ -109,7 +120,7 @@ export function buildFixPrompt(
   analysisOutput: string,
   input: AnalysisInput,
 ): string {
-  const { apps, packages, edges, turboJsonContent } = input;
+  const { apps, packages, edges, turboJsonContent, turboConfigFile } = input;
 
   const allPkgs = [...apps, ...packages];
 
@@ -127,8 +138,10 @@ export function buildFixPrompt(
       ? edges.map((e) => `${e.from} → ${e.to} (${e.type})`).join("\n")
       : "(none)";
 
+  const { filename: turboFilename, fence: turboFence } =
+    turboConfigLabels(turboConfigFile);
   const turboSection = turboJsonContent
-    ? `\n### turbo.json\n\`\`\`json\n${turboJsonContent}\n\`\`\`\n`
+    ? `\n### ${turboFilename}\n\`\`\`${turboFence}\n${turboJsonContent}\n\`\`\`\n`
     : "";
 
   return `Fix the issues found in this Turborepo monorepo.

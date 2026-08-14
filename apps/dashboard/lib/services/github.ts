@@ -559,9 +559,10 @@ class GitHubService {
   }
 
   /**
-   * Batch check for turbo.json in multiple repositories using GraphQL
+   * Batch check for a Turborepo config (turbo.json or turbo.jsonc) in multiple
+   * repositories using GraphQL
    */
-  async batchCheckTurboJson(
+  async batchCheckTurboConfig(
     repositories: Array<{ owner: string; name: string }>,
   ): Promise<Map<string, boolean>> {
     const BATCH_SIZE = 50;
@@ -574,7 +575,10 @@ class GitHubService {
         .map(
           (repo, index) => `
         repo${index}: repository(owner: "${repo.owner}", name: "${repo.name}") {
-          object(expression: "HEAD:turbo.json") {
+          turboJson: object(expression: "HEAD:turbo.json") {
+            ... on Blob { id }
+          }
+          turboJsonc: object(expression: "HEAD:turbo.jsonc") {
             ... on Blob { id }
           }
         }
@@ -590,7 +594,7 @@ class GitHubService {
         batch.forEach((repo, index) => {
           const repoData = response.data?.[`repo${index}`];
           const key = `${repo.owner}/${repo.name}`;
-          results.set(key, !!repoData?.object);
+          results.set(key, !!(repoData?.turboJson || repoData?.turboJsonc));
         });
       } catch (error) {
         console.warn("GraphQL batch check failed:", error);

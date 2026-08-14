@@ -9,7 +9,7 @@ import {
   calculateGraphLayout,
   generateSvgDocument,
 } from "@workspace/graph";
-import { analyzeTurborepo, checkIsTurborepo } from "./analyzer.js";
+import { analyzeTurborepo, resolveTurboConfigFile } from "./analyzer.js";
 
 const program = new Command();
 
@@ -30,9 +30,11 @@ program
     console.log(chalk.blue("🔍 Analyzing Turborepo workspace..."));
 
     // Check if this is a Turborepo
-    if (!checkIsTurborepo(rootDir)) {
+    if (!resolveTurboConfigFile(rootDir)) {
       console.error(
-        chalk.red("❌ Error: No turbo.json found. Is this a Turborepo?")
+        chalk.red(
+          "❌ Error: No turbo.json or turbo.jsonc found. Is this a Turborepo?"
+        )
       );
       process.exit(1);
     }

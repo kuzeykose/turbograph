@@ -48,4 +48,6 @@ export interface TurborepoStructure {
   apps: PackageInfo[];
   packages: PackageInfo[];
   workspacePackages: Set<string>;
+  /** Resolved config filename ("turbo.json" or "turbo.jsonc"); undefined when not a Turborepo. */
+  turboConfigFile?: string;
 }

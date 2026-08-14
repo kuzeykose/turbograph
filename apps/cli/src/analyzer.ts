@@ -2,14 +2,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { glob } from "glob";
 import { parse as parseYaml } from "yaml";
+import { TURBO_CONFIG_FILENAMES } from "@workspace/graph";
 import type { PackageInfo, TurborepoStructure } from "@workspace/graph";
 
 /**
- * Check if the current directory is a Turborepo by looking for turbo.json
+ * Resolve which Turborepo config file the directory uses, in turbo's own
+ * resolution order. Returns null when the directory has neither.
  */
-export function checkIsTurborepo(rootDir: string): boolean {
-  const turboJsonPath = path.join(rootDir, "turbo.json");
-  return fs.existsSync(turboJsonPath);
+export function resolveTurboConfigFile(rootDir: string): string | null {
+  return (
+    TURBO_CONFIG_FILENAMES.find((filename) =>
+      fs.existsSync(path.join(rootDir, filename))
+    ) ?? null
+  );
 }
 
 /**
@@ -96,9 +101,9 @@ function getPackageType(
 export async function analyzeTurborepo(
   rootDir: string
 ): Promise<TurborepoStructure> {
-  const isTurborepo = checkIsTurborepo(rootDir);
+  const turboConfigFile = resolveTurboConfigFile(rootDir);
 
-  if (!isTurborepo) {
+  if (!turboConfigFile) {
     return {
       isTurborepo: false,
       apps: [],
@@ -144,5 +149,6 @@ export async function analyzeTurborepo(
     apps,
     packages,
     workspacePackages,
+    turboConfigFile,
   };
 }

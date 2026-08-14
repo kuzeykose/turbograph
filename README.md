@@ -84,7 +84,7 @@ npx trbgraph -d ../my-monorepo
 
 ### How it works
 
-1. Detects `turbo.json` to confirm the project is a Turborepo
+1. Detects `turbo.json` (or `turbo.jsonc`) to confirm the project is a Turborepo
 2. Reads `pnpm-workspace.yaml` (or `package.json` workspaces) to discover workspace packages
 3. Parses each `package.json` and resolves internal dependency edges
 4. Calculates a hierarchical BFS layout

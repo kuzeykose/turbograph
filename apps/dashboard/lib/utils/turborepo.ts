@@ -20,21 +20,28 @@ export {
   edgeColors,
 } from "@workspace/graph";
 
+import { TURBO_CONFIG_FILENAMES } from "@workspace/graph";
 import type { PackageInfo, TurborepoStructure } from "@workspace/graph";
 
 /**
- * Check if a repository is a Turborepo by looking for turbo.json
+ * Resolve which Turborepo config file a repository uses, in turbo's own
+ * resolution order. Returns null when the repo has neither.
  */
-export async function checkIsTurborepo(
+export async function resolveTurboConfigFile(
   owner: string,
   repo: string,
-  token: string,
-): Promise<boolean> {
-  try {
-    return await githubService.checkFileExists(owner, repo, "turbo.json");
-  } catch {
-    return false;
+): Promise<string | null> {
+  for (const filename of TURBO_CONFIG_FILENAMES) {
+    try {
+      if (await githubService.checkFileExists(owner, repo, filename)) {
+        return filename;
+      }
+    } catch {
+      // Treat request failures as "not found" and try the next candidate
+    }
   }
+
+  return null;
 }
 
 /**
@@ -82,9 +89,9 @@ export async function analyzeTurborepo(
   repo: string,
   token: string,
 ): Promise<TurborepoStructure> {
-  const isTurborepo = await checkIsTurborepo(owner, repo, token);
+  const turboConfigFile = await resolveTurboConfigFile(owner, repo);
 
-  if (!isTurborepo) {
+  if (!turboConfigFile) {
     return {
       isTurborepo: false,
       apps: [],
@@ -127,5 +134,6 @@ export async function analyzeTurborepo(
     apps: validApps,
     packages: validPackages,
     workspacePackages,
+    turboConfigFile,
   };
 }

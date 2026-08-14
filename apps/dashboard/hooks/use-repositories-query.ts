@@ -35,7 +35,7 @@ async function fetchRepositories(): Promise<RepositoriesResult> {
   });
 
   const turborepoResults =
-    await githubService.batchCheckTurboJson(repositoriesToCheck);
+    await githubService.batchCheckTurboConfig(repositoriesToCheck);
 
   const repositories = repos.map((repo) => ({
     ...repo,

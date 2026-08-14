@@ -103,14 +103,22 @@ export function AnalysisTab({
     setShowFixPane(false);
     resetFix();
 
+    const turboConfigFile = turborepoStructure.turboConfigFile;
     let turboJsonContent: string | undefined;
-    try {
-      const data = await githubService.getContents(owner, repo, "turbo.json");
-      if (!Array.isArray(data) && "content" in data) {
-        turboJsonContent = data.content;
+
+    if (turboConfigFile) {
+      try {
+        const data = await githubService.getContents(
+          owner,
+          repo,
+          turboConfigFile,
+        );
+        if (!Array.isArray(data) && "content" in data) {
+          turboJsonContent = data.content;
+        }
+      } catch {
+        // turbo config fetch is best-effort
       }
-    } catch {
-      // turbo.json fetch is best-effort
     }
 
     setTurboJsonCache(turboJsonContent);
@@ -120,6 +128,7 @@ export function AnalysisTab({
       packages: turborepoStructure.packages,
       edges: dependencyGraph,
       turboJsonContent,
+      turboConfigFile,
     });
   }, [turborepoStructure, dependencyGraph, owner, repo, runAnalysis, resetFix]);
 
@@ -135,6 +144,7 @@ export function AnalysisTab({
       packages: turborepoStructure.packages,
       edges: dependencyGraph,
       turboJsonContent: turboJsonCache,
+      turboConfigFile: turborepoStructure.turboConfigFile,
     });
   }, [analysis, turborepoStructure, dependencyGraph, turboJsonCache, runFixPlan]);
 

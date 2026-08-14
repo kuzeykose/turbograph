@@ -15,3 +15,9 @@ export const DEFAULT_MIN_VERTICAL_GAP = 52;
 
 /** Minimum horizontal spacing between depth columns (center-to-center). */
 export const DEFAULT_MIN_LEVEL_WIDTH = 210;
+
+/**
+ * Config filenames Turborepo accepts, in resolution order.
+ * Turbo reads `turbo.json` first and falls back to `turbo.jsonc`.
+ */
+export const TURBO_CONFIG_FILENAMES = ["turbo.json", "turbo.jsonc"] as const;

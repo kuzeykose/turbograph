@@ -8,6 +8,7 @@ interface AnalysisInput {
   packages: PackageInfo[];
   edges: DependencyEdge[];
   turboJsonContent?: string;
+  turboConfigFile?: string;
 }
 
 interface UseAnalysisReturn {
@@ -59,6 +60,7 @@ export function useAnalysis(): UseAnalysisReturn {
           })),
           edges: input.edges,
           turboJsonContent: input.turboJsonContent,
+          turboConfigFile: input.turboConfigFile,
         }),
         signal: controller.signal,
       });
@@ -146,6 +148,7 @@ export function useFixPlan(): UseFixPlanReturn {
           })),
           edges: input.edges,
           turboJsonContent: input.turboJsonContent,
+          turboConfigFile: input.turboConfigFile,
         }),
         signal: controller.signal,
       });

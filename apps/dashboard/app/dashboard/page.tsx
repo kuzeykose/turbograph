@@ -357,7 +357,7 @@ export default function DashboardPage() {
                 No Turborepo projects found
               </p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                None of your {repositories.length} repositories contain a turbo.json file.
+                None of your {repositories.length} repositories contain a turbo.json or turbo.jsonc file.
               </p>
               <button
                 onClick={() => setFilter("all")}

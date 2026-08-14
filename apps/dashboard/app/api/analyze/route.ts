@@ -10,7 +10,15 @@ const client = new Anthropic();
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { apps, packages, edges, turboJsonContent, mode, analysisOutput } = body;
+  const {
+    apps,
+    packages,
+    edges,
+    turboJsonContent,
+    turboConfigFile,
+    mode,
+    analysisOutput,
+  } = body;
 
   if (!apps || !packages || !edges) {
     return new Response(
@@ -29,10 +37,22 @@ export async function POST(req: Request) {
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    prompt = buildFixPrompt(analysisOutput, { apps, packages, edges, turboJsonContent });
+    prompt = buildFixPrompt(analysisOutput, {
+      apps,
+      packages,
+      edges,
+      turboJsonContent,
+      turboConfigFile,
+    });
     systemPrompt = FIX_SYSTEM_PROMPT;
   } else {
-    prompt = buildAnalysisPrompt({ apps, packages, edges, turboJsonContent });
+    prompt = buildAnalysisPrompt({
+      apps,
+      packages,
+      edges,
+      turboJsonContent,
+      turboConfigFile,
+    });
     systemPrompt = SYSTEM_PROMPT;
   }
 
