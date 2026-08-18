@@ -147,7 +147,9 @@ export function generateSvgDocument(
       const path = generateEdgePath(source, target, edgeOpts);
       const color = edgeColorsHex[edge.type];
       const dashArray =
-        edge.type === "devDependency" ? 'stroke-dasharray="6 4"' : "";
+        edge.type === "devDependency" || edge.type === "import"
+          ? 'stroke-dasharray="6 4"'
+          : "";
 
       return `    <path d="${path}" fill="none" stroke="${color}" stroke-width="1.5" ${dashArray} marker-end="url(#arrow-${edge.type})"/>`;
     })
@@ -209,6 +211,9 @@ export function generateSvgDocument(
     </marker>
     <marker id="arrow-devDependency" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="${edgeColorsHex.devDependency}"/>
+    </marker>
+    <marker id="arrow-import" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="${edgeColorsHex.import}"/>
     </marker>
   </defs>
   

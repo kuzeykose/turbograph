@@ -9,6 +9,7 @@ import {
   TurborepoStructure,
   DependencyEdge,
 } from "@/lib/utils/turborepo";
+import { analyzeImportGraph } from "@/lib/utils/imports";
 
 export function useRepositoryQuery(owner: string, repo: string) {
   return useQuery({
@@ -43,6 +44,36 @@ export function useTurborepoAnalysisQuery(
       return { structure, dependencyGraph };
     },
     enabled: !!owner && !!repo,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+interface ImportGraphAnalysis {
+  edges: DependencyEdge[];
+  scannedFiles: number;
+  truncated: boolean;
+}
+
+export function useImportGraphQuery(
+  owner: string,
+  repo: string,
+  structure: TurborepoStructure | null,
+  branch?: string,
+  enabled = false,
+) {
+  return useQuery<ImportGraphAnalysis>({
+    queryKey: queryKeys.repository.imports(owner, repo, branch),
+    queryFn: async () => {
+      if (!structure) {
+        return { edges: [], scannedFiles: 0, truncated: false };
+      }
+      const ref =
+        branch ||
+        (await githubService.getRepository(owner, repo)).default_branch ||
+        "HEAD";
+      return analyzeImportGraph(owner, repo, structure, ref);
+    },
+    enabled: enabled && !!owner && !!repo && !!structure?.isTurborepo,
     staleTime: 5 * 60 * 1000,
   });
 }

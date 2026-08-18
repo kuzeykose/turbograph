@@ -10,6 +10,7 @@ import { CommitsTab } from "@/components/commits-tab";
 import { DependenciesTab } from "@/components/dependencies-tab";
 import { PackagesTab } from "@/components/packages-tab";
 import { AnalysisTab } from "@/components/analysis-tab";
+import { ImportsTab } from "@/components/imports-tab";
 import { useFileNavigation } from "@/hooks/use-file-navigation";
 import { useCommitHistory } from "@/hooks/use-commit-history";
 import { useImpactAnalysis } from "@/hooks/use-impact-analysis";
@@ -22,6 +23,11 @@ export default function RepositoryPage() {
     branch,
     turborepoStructure,
     dependencyGraph,
+    importGraph,
+    importGraphLoading,
+    importGraphTruncated,
+    importGraphScannedFiles,
+    importGraphError,
     turborepoLoading,
     error: repoError,
     activeTab,
@@ -203,6 +209,20 @@ export default function RepositoryPage() {
               turborepoStructure={turborepoStructure}
               turborepoLoading={turborepoLoading}
               dependencyGraph={dependencyGraph}
+              owner={owner}
+              repo={repo}
+              branch={branch}
+            />
+          )}
+
+          {activeTab === "imports" && turborepoStructure?.isTurborepo && (
+            <ImportsTab
+              turborepoStructure={turborepoStructure}
+              importGraph={importGraph}
+              loading={turborepoLoading || importGraphLoading}
+              truncated={importGraphTruncated}
+              scannedFiles={importGraphScannedFiles}
+              error={importGraphError}
               owner={owner}
               repo={repo}
               branch={branch}

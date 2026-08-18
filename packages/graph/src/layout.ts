@@ -239,6 +239,7 @@ export function calculateGraphLayout(
     source: dep.from,
     target: dep.to,
     type: dep.type,
+    count: dep.count,
   }));
 
   // Build adjacency lists for dependency graph

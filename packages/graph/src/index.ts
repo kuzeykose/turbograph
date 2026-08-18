@@ -2,6 +2,7 @@
 export type {
   PackageInfo,
   DependencyEdge,
+  DependencyEdgeType,
   GraphNode,
   GraphEdge,
   TurborepoStructure,
@@ -46,3 +47,11 @@ export {
   selectWorkspacePackageJsons,
   toPosixPath,
 } from "./analyze";
+
+export {
+  MAX_IMPORT_SOURCE_FILES,
+  buildImportGraph,
+  extractImportSpecifiers,
+  isImportSourceFile,
+  selectImportSourceFiles,
+} from "./imports";

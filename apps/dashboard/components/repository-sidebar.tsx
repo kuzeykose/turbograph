@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRepositoryContext } from "@/contexts/repository-context";
-import { Clock, BarChart3, List, Menu, Sparkles } from "@workspace/ui/icons";
+import { Clock, BarChart3, List, Menu, Sparkles, Waypoints } from "@workspace/ui/icons";
 import { Button } from "@workspace/ui/components/button";
 import {
   Sheet,
@@ -13,7 +13,13 @@ import {
 } from "@workspace/ui/components/sheet";
 import { cn } from "@workspace/ui/lib/utils";
 
-type TabValue = "files" | "commits" | "turborepo" | "packages" | "analysis";
+type TabValue =
+  | "files"
+  | "commits"
+  | "turborepo"
+  | "imports"
+  | "packages"
+  | "analysis";
 
 interface NavItem {
   value: TabValue;
@@ -124,6 +130,11 @@ export function RepositorySidebar() {
           value: "turborepo" as const,
           label: "Dependencies",
           icon: <BarChart3 className="h-4 w-4" />,
+        },
+        {
+          value: "imports" as const,
+          label: "Imports",
+          icon: <Waypoints className="h-4 w-4" />,
         },
         {
           value: "commits" as const,

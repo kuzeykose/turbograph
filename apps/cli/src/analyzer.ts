@@ -5,6 +5,7 @@ import {
   TURBO_CONFIG_FILENAMES,
   analyzeWorkspace,
   getWorkspacePatterns,
+  isImportSourceFile,
   toPosixPath,
 } from "@workspace/graph";
 import type { TurborepoStructure } from "@workspace/graph";
@@ -78,4 +79,45 @@ export async function analyzeTurborepo(
   }
 
   return analyzeWorkspace(files);
+}
+
+const SOURCE_GLOB = "**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts}";
+
+/**
+ * Read JS/TS source files under workspace package directories.
+ */
+export async function collectImportSourceFiles(
+  rootDir: string,
+  packageDirs: string[]
+): Promise<Map<string, string>> {
+  const files = new Map<string, string>();
+
+  for (const packageDir of packageDirs) {
+    const absDir = path.join(rootDir, packageDir);
+    const matches = await glob(SOURCE_GLOB, {
+      cwd: absDir,
+      nodir: true,
+      dot: false,
+      ignore: [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/.next/**",
+        "**/coverage/**",
+        "**/.turbo/**",
+      ],
+    });
+
+    for (const relative of matches) {
+      const repoPath = toPosixPath(path.join(packageDir, relative));
+      if (!isImportSourceFile(repoPath)) {
+        continue;
+      }
+      const content = readTextIfExists(path.join(absDir, relative));
+      if (content !== null) {
+        files.set(repoPath, content);
+      }
+    }
+  }
+
+  return files;
 }

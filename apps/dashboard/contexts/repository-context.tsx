@@ -11,11 +11,18 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
   useRepositoryQuery,
   useTurborepoAnalysisQuery,
+  useImportGraphQuery,
 } from "@/hooks/use-repository-query";
 import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { Repository } from "@/types/repository";
 
-type TabValue = "files" | "commits" | "turborepo" | "packages" | "analysis";
+type TabValue =
+  | "files"
+  | "commits"
+  | "turborepo"
+  | "imports"
+  | "packages"
+  | "analysis";
 
 interface RepositoryContextType {
   // Route params
@@ -27,6 +34,11 @@ interface RepositoryContextType {
   repository: Repository | null;
   turborepoStructure: TurborepoStructure | null;
   dependencyGraph: DependencyEdge[];
+  importGraph: DependencyEdge[];
+  importGraphLoading: boolean;
+  importGraphTruncated: boolean;
+  importGraphScannedFiles: number;
+  importGraphError: string | null;
   loading: boolean;
   turborepoLoading: boolean;
   error: string | null;
@@ -36,8 +48,17 @@ interface RepositoryContextType {
   setActiveTab: (tab: TabValue) => void;
 }
 
+const REPO_TABS: TabValue[] = [
+  "files",
+  "commits",
+  "turborepo",
+  "imports",
+  "packages",
+  "analysis",
+];
+
 const RepositoryContext = createContext<RepositoryContextType | undefined>(
-  undefined
+  undefined,
 );
 
 export function RepositoryProvider({
@@ -57,7 +78,7 @@ export function RepositoryProvider({
   // Tab state - read from URL or default to "files"
   const tabFromUrl = searchParams.get("tab") as TabValue | null;
   const [activeTab, setActiveTabState] = useState<TabValue>(
-    tabFromUrl && ["files", "commits", "turborepo", "packages", "analysis"].includes(tabFromUrl)
+    tabFromUrl && REPO_TABS.includes(tabFromUrl)
       ? tabFromUrl
       : "turborepo"
   );
@@ -76,6 +97,27 @@ export function RepositoryProvider({
 
   const turborepoStructure = turborepoData?.structure ?? null;
   const dependencyGraph = turborepoData?.dependencyGraph ?? [];
+
+  const {
+    data: importGraphData,
+    isLoading: importGraphLoading,
+    error: importGraphQueryError,
+  } = useImportGraphQuery(
+    owner,
+    repo,
+    turborepoStructure,
+    branch,
+    activeTab === "imports",
+  );
+
+  const importGraph = importGraphData?.edges ?? [];
+  const importGraphTruncated = importGraphData?.truncated ?? false;
+  const importGraphScannedFiles = importGraphData?.scannedFiles ?? 0;
+  const importGraphError = importGraphQueryError
+    ? importGraphQueryError instanceof Error
+      ? importGraphQueryError.message
+      : "Failed to scan imports"
+    : null;
   const error = repoError ? (repoError instanceof Error ? repoError.message : "Failed to fetch repository") : null;
 
   // Tab setter that syncs with URL
@@ -105,7 +147,7 @@ export function RepositoryProvider({
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab") as TabValue | null;
     const newTab =
-      tabFromUrl && ["files", "commits", "turborepo", "packages", "analysis"].includes(tabFromUrl)
+      tabFromUrl && REPO_TABS.includes(tabFromUrl)
         ? tabFromUrl
         : "turborepo";
     setActiveTabState(newTab);
@@ -120,6 +162,11 @@ export function RepositoryProvider({
         repository,
         turborepoStructure,
         dependencyGraph,
+        importGraph,
+        importGraphLoading,
+        importGraphTruncated,
+        importGraphScannedFiles,
+        importGraphError,
         loading,
         turborepoLoading,
         error,

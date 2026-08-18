@@ -8,13 +8,17 @@ export interface PackageInfo {
   devDependencies: Record<string, string>;
 }
 
+export type DependencyEdgeType = "dependency" | "devDependency" | "import";
+
 /**
  * Represents a dependency relationship between two packages
  */
 export interface DependencyEdge {
   from: string;
   to: string;
-  type: "dependency" | "devDependency";
+  type: DependencyEdgeType;
+  /** How many source files contribute to this edge (import graphs). */
+  count?: number;
 }
 
 /**
@@ -37,7 +41,8 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  type: "dependency" | "devDependency";
+  type: DependencyEdgeType;
+  count?: number;
 }
 
 /**

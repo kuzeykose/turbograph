@@ -129,6 +129,8 @@ interface TurborepoGraphVisualProps {
   dependencies: DependencyEdge[];
   className?: string;
   github?: GraphGithubContext | null;
+  /** Which edge legend to show. Defaults to declared package.json deps. */
+  edgeMode?: "declared" | "imports";
 }
 
 export function TurborepoGraphVisual({
@@ -137,6 +139,7 @@ export function TurborepoGraphVisual({
   dependencies,
   className,
   github = null,
+  edgeMode = "declared",
 }: TurborepoGraphVisualProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -659,6 +662,17 @@ export function TurborepoGraphVisual({
             >
               <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.devDependency} />
             </marker>
+            <marker
+              id="arrow-import"
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill={edgeColors.import} />
+            </marker>
           </defs>
 
           {/* Grid background */}
@@ -694,7 +708,11 @@ export function TurborepoGraphVisual({
                     stroke={edgeColors[edge.type]}
                     strokeWidth={1}
                     strokeDasharray={
-                      edge.type === "devDependency" ? "6 4" : "none"
+                      edge.type === "devDependency"
+                        ? "6 4"
+                        : edge.type === "import"
+                          ? "2 3"
+                          : "none"
                     }
                     markerEnd={`url(#arrow-${edge.type})`}
                   />
@@ -898,7 +916,11 @@ export function TurborepoGraphVisual({
                                   {e.target}
                                 </span>
                                 <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
-                                  {e.type === "devDependency" ? "dev" : "prod"}
+                                  {e.type === "import"
+                                    ? `${e.count ?? 1} import${(e.count ?? 1) === 1 ? "" : "s"}`
+                                    : e.type === "devDependency"
+                                      ? "dev"
+                                      : "prod"}
                                 </span>
                               </li>
                             ))}
@@ -920,7 +942,11 @@ export function TurborepoGraphVisual({
                                   {e.source}
                                 </span>
                                 <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
-                                  {e.type === "devDependency" ? "dev" : "prod"}
+                                  {e.type === "import"
+                                    ? `${e.count ?? 1} import${(e.count ?? 1) === 1 ? "" : "s"}`
+                                    : e.type === "devDependency"
+                                      ? "dev"
+                                      : "prod"}
                                 </span>
                               </li>
                             ))}
@@ -957,26 +983,44 @@ export function TurborepoGraphVisual({
               <span className="text-xs font-medium text-muted-foreground">
                 Edges
               </span>
-              <div className="flex items-center gap-2">
-                <div
-                  className="h-0.5 w-5 rounded-full"
-                  style={{ backgroundColor: edgeColors.dependency }}
-                />
-                <span className="text-xs text-muted-foreground">
-                  Dependency
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div
-                  className="h-0.5 w-5 rounded-full"
-                  style={{
-                    backgroundColor: edgeColors.devDependency,
-                    backgroundImage:
-                      "repeating-linear-gradient(90deg, transparent, transparent 3px, oklch(0.09 0 0) 3px, oklch(0.09 0 0) 5px)",
-                  }}
-                />
-                <span className="text-xs text-muted-foreground">Dev</span>
-              </div>
+              {edgeMode === "imports" ? (
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-0.5 w-5 rounded-full"
+                    style={{
+                      backgroundColor: edgeColors.import,
+                      backgroundImage:
+                        "repeating-linear-gradient(90deg, transparent, transparent 2px, oklch(0.09 0 0) 2px, oklch(0.09 0 0) 4px)",
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Import usage
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-0.5 w-5 rounded-full"
+                      style={{ backgroundColor: edgeColors.dependency }}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Dependency
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-0.5 w-5 rounded-full"
+                      style={{
+                        backgroundColor: edgeColors.devDependency,
+                        backgroundImage:
+                          "repeating-linear-gradient(90deg, transparent, transparent 3px, oklch(0.09 0 0) 3px, oklch(0.09 0 0) 5px)",
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">Dev</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
       </div>
