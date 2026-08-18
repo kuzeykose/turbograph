@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useAnalysis, useFixPlan } from "@/hooks/use-analysis";
 import type { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { githubService } from "@/lib/services/github";
+import { buildLoginUrl } from "@/lib/auth/redirect";
 import {
   Sparkles,
   AlertCircle,
@@ -88,7 +89,7 @@ export function AnalysisTab({
             and Turborepo best practices is available for signed-in users.
           </p>
           <Link
-            href="/login"
+            href={buildLoginUrl(`/repository/${owner}/${repo}?tab=analysis`)}
             className="mt-5 inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600"
           >
             <LogIn className="h-3.5 w-3.5" />

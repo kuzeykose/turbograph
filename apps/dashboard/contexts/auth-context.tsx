@@ -4,6 +4,11 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { buildOAuthCallbackUrl, getSafeRedirectPath } from "@/lib/auth/redirect";
+import {
+  serializeClearedGitHubProviderTokenCookie,
+  serializeGitHubProviderTokenCookie,
+} from "@/lib/auth/github-token-cookie";
 
 interface AuthContextType {
   user: User | null;
@@ -43,7 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Save provider token to cookie if available
       // Supabase only provides provider_token during sign-in events
       if (session?.provider_token && typeof document !== "undefined") {
-        document.cookie = `gh_provider_token=${session.provider_token}; path=/; max-age=${60 * 60 * 8}; sameSite=lax${window.location.protocol === "https:" ? "; secure" : ""}`;
+        document.cookie = serializeGitHubProviderTokenCookie(
+          session.provider_token,
+        );
         // Clear the refresh-attempt flag on successful token retrieval
         sessionStorage.removeItem("gh_token_refresh_attempted");
       }
@@ -57,8 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
 
     if (typeof document !== "undefined") {
-      document.cookie =
-        "gh_provider_token=; path=/; max-age=0; sameSite=lax; secure";
+      document.cookie = serializeClearedGitHubProviderTokenCookie();
     }
 
     router.push("/login");
@@ -85,12 +91,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem(refreshKey, "true");
 
     const supabase = createSupabaseBrowserClient();
-    const redirectPath = returnTo || window.location.pathname;
+    const redirectPath = getSafeRedirectPath(
+      returnTo || `${window.location.pathname}${window.location.search}`,
+    );
 
     await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
+        redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectPath),
       },
     });
   };
@@ -109,4 +117,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

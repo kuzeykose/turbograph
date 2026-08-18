@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { Github, ArrowRight } from "@workspace/ui/icons";
 import { Button } from "@workspace/ui/components/button";
 import { Logo } from "@/components/logo";
+import { buildLoginUrl } from "@/lib/auth/redirect";
 
 export function Header() {
   const { user, loading } = useAuth();
@@ -41,7 +42,7 @@ export function Header() {
                 </Button>
               ) : (
                 <Button asChild size="sm" variant="outline">
-                  <Link href="/login">Sign in</Link>
+                  <Link href={buildLoginUrl()}>Sign in</Link>
                 </Button>
               )}
             </>
