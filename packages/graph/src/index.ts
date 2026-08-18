@@ -35,3 +35,14 @@ export {
 // SVG
 export type { SvgOptions, EdgePathOptions } from "./svg";
 export { generateEdgePath, generateSvgDocument } from "./svg";
+
+// Workspace analysis (isomorphic — works on a path → file-text map)
+export {
+  analyzeWorkspace,
+  getWorkspacePatterns,
+  isWorkspacePackageDir,
+  posixDirname,
+  resolveTurboConfigFileFromFiles,
+  selectWorkspacePackageJsons,
+  toPosixPath,
+} from "./analyze";

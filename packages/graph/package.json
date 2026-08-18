@@ -8,6 +8,10 @@
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit"
   },
+  "dependencies": {
+    "minimatch": "^10.0.3",
+    "yaml": "^2.8.2"
+  },
   "devDependencies": {
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",

@@ -72,7 +72,7 @@ export function RepositoryProvider({
   const {
     data: turborepoData,
     isLoading: turborepoLoading,
-  } = useTurborepoAnalysisQuery(owner, repo);
+  } = useTurborepoAnalysisQuery(owner, repo, branch);
 
   const turborepoStructure = turborepoData?.structure ?? null;
   const dependencyGraph = turborepoData?.dependencyGraph ?? [];

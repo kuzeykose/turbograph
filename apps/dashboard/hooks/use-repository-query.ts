@@ -24,11 +24,19 @@ interface TurborepoAnalysis {
   dependencyGraph: DependencyEdge[];
 }
 
-export function useTurborepoAnalysisQuery(owner: string, repo: string) {
+export function useTurborepoAnalysisQuery(
+  owner: string,
+  repo: string,
+  branch?: string,
+) {
   return useQuery<TurborepoAnalysis>({
-    queryKey: queryKeys.repository.turborepo(owner, repo),
+    queryKey: queryKeys.repository.turborepo(owner, repo, branch),
     queryFn: async () => {
-      const structure = await analyzeTurborepo(owner, repo, "");
+      const ref =
+        branch ||
+        (await githubService.getRepository(owner, repo)).default_branch ||
+        "HEAD";
+      const structure = await analyzeTurborepo(owner, repo, ref);
       const dependencyGraph = structure.isTurborepo
         ? buildDependencyGraph(structure)
         : [];

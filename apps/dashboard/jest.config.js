@@ -7,10 +7,15 @@ const createJestConfig = nextJest({
 
 // Add any custom config to be passed to Jest
 const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    // yaml/minimatch default to ESM; Jest needs their CJS builds.
+    '^yaml$':
+      '<rootDir>/../../packages/graph/node_modules/yaml/dist/index.js',
+    '^minimatch$':
+      '<rootDir>/../../packages/graph/node_modules/minimatch/dist/commonjs/index.js',
   },
   testMatch: [
     '**/__tests__/**/*.test.[jt]s?(x)',
