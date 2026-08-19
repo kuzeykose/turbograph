@@ -11,16 +11,22 @@ export interface RepositoryWithTurbo extends GitHubRepository {
 
 interface RepositoriesResult {
   repositories: RepositoryWithTurbo[];
+  needsInstallation: boolean;
 }
 
 async function fetchRepositories(): Promise<RepositoriesResult> {
-  const repos = await githubService.getUserRepositories({
+  const installations = await githubService.getUserInstallations();
+
+  if (installations.length === 0) {
+    return { repositories: [], needsInstallation: true };
+  }
+
+  const repos = await githubService.getAccessibleRepositories({
     sort: "updated",
-    type: "all",
   });
 
   if (repos.length === 0) {
-    return { repositories: [] };
+    return { repositories: [], needsInstallation: false };
   }
 
   const repositoriesToCheck = repos.map((repo) => {
@@ -36,7 +42,7 @@ async function fetchRepositories(): Promise<RepositoriesResult> {
     isTurborepo: turborepoResults.get(repo.full_name) || false,
   }));
 
-  return { repositories };
+  return { repositories, needsInstallation: false };
 }
 
 export function useRepositoriesQuery(enabled = true) {
@@ -51,5 +57,6 @@ export function useRepositoriesQuery(enabled = true) {
   return {
     ...query,
     repositories: query.data?.repositories ?? [],
+    needsInstallation: query.data?.needsInstallation ?? false,
   };
 }

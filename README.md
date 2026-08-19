@@ -104,14 +104,14 @@ A Next.js web application for exploring GitHub repositories and visualizing Turb
 
 ### Setup
 
-Sign-in is **Supabase Auth with the GitHub OAuth provider**. Users are GitHub OAuth users in Supabase; there is no separate GitHub App install for login.
+Sign-in is **Supabase Auth with the GitHub OAuth provider**. That step only identifies the user. Repositories are chosen afterward with the TurboGraph GitHub App — users pick specific repos; nothing is granted by default.
 
 1. **Create a GitHub OAuth App** (not a GitHub App) at [GitHub Developer Settings](https://github.com/settings/developers) → **OAuth Apps** → **New OAuth App**.
    - Homepage URL: `http://localhost:3000` (and your production origin later)
    - **Authorization callback URL** must be the Supabase callback, not this app:
      `https://<project-ref>.supabase.co/auth/v1/callback`
 
-2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Set scopes to `public_repo read:user` (do not use `repo`, which asks for private repositories).
+2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Leave extra scopes empty (or `user:email` only). Do **not** add `repo` or `public_repo`.
 
 3. **Allow the app callback** in Supabase (Authentication → URL Configuration → Redirect URLs):
    `http://localhost:3000/auth/callback` (and `https://your-domain/auth/callback` in production)
@@ -121,6 +121,7 @@ Sign-in is **Supabase Auth with the GitHub OAuth provider**. Users are GitHub OA
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   NEXT_PUBLIC_GITHUB_APP_SLUG=your-github-app-slug
    ```
 
 5. **Run the dashboard:**
@@ -136,7 +137,7 @@ Sign-in is **Supabase Auth with the GitHub OAuth provider**. Users are GitHub OA
 - **Commit history** -- paginated commit log with branch selection
 - **Dependency graph** -- interactive visualization of Turborepo workspace dependencies (graph and list views)
 - **Impact analysis** -- trace how changes propagate through the dependency tree
-- **GitHub OAuth** -- sign in for higher API rate limits and your public repositories
+- **GitHub OAuth** -- sign in for identity and higher API rate limits; pick repositories via the GitHub App
 
 ## Tech stack
 

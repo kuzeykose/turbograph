@@ -1,11 +1,11 @@
 export const DEFAULT_POST_LOGIN_PATH = "/dashboard";
 
 /**
- * Scopes requested on Supabase `signInWithOAuth({ provider: "github" })`.
- * Use `public_repo` instead of `repo` so GitHub does not ask for private
- * repositories. Supabase may still request email for the user account.
+ * Identity-only scopes for Supabase GitHub OAuth.
+ * Do not request `repo` or `public_repo` here — users pick repositories
+ * themselves by installing the GitHub App.
  */
-export const GITHUB_OAUTH_SCOPES = "public_repo read:user";
+export const GITHUB_OAUTH_SCOPES = "user:email";
 
 /**
  * Accept only same-origin relative paths to avoid open redirects.

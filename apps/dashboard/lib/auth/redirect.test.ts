@@ -73,7 +73,7 @@ describe("loginErrorMessage", () => {
 });
 
 describe("GITHUB_OAUTH_SCOPES", () => {
-  it("requests public repo access through an OAuth App", () => {
-    expect(GITHUB_OAUTH_SCOPES).toBe("public_repo read:user");
+  it("requests identity only, not repository access", () => {
+    expect(GITHUB_OAUTH_SCOPES).toBe("user:email");
   });
 });

@@ -72,7 +72,7 @@ function LoginForm() {
             Sign in with GitHub
           </h1>
           <p className="mt-1 text-base text-zinc-400 dark:text-zinc-500">
-            Sign in with your GitHub account to continue.
+            Sign in with your GitHub account. You will pick repositories next.
           </p>
         </div>
 
@@ -103,8 +103,8 @@ function LoginForm() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          GitHub will ask for access to your public repositories. You can revoke
-          it anytime from GitHub Settings → Applications.
+          Sign-in only uses your GitHub identity. Repository access is selected
+          separately after you log in.
         </p>
       </div>
     </main>

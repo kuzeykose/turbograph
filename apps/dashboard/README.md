@@ -41,13 +41,11 @@ This Next.js application demonstrates client-side GitHub OAuth authentication us
 2. Go to **Authentication** > **Sign In / Providers** > **GitHub**
 3. Enable GitHub provider
 4. Enter your GitHub OAuth App **Client ID** and **Client Secret** (from an OAuth App, not a GitHub App)
-5. **Important**: Add the following scopes so the GitHub `provider_token` can list public repositories:
-   - `public_repo` - Access public repositories only (do not use `repo`; that asks for private repos)
-   - `read:user` - Read the signed-in GitHub user
+5. Leave extra GitHub provider scopes empty (or `user:email` only). Do **not** add `repo` or `public_repo` — users select repositories later with the GitHub App.
 6. Add this app's callback to **Authentication** > **URL Configuration** > **Redirect URLs**:
    `http://localhost:3000/auth/callback`
 
-**Note**: Keep the GitHub provider scopes in Supabase matching the app (`public_repo read:user`). If the dashboard still has `repo`, GitHub will ask for private repositories. GitHub Apps cannot replace this OAuth App for Supabase sign-in.
+**Note**: GitHub Apps cannot replace the OAuth App for Supabase sign-in. The GitHub App is only for choosing which repositories to list.
 
 ### 3. Configure Environment Variables
 
