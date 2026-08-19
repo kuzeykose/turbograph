@@ -4,6 +4,7 @@ import {
   getSafeRedirectPath,
   loginErrorMessage,
   pathWithSearch,
+  GITHUB_OAUTH_SCOPES,
 } from "./redirect";
 
 describe("getSafeRedirectPath", () => {
@@ -68,5 +69,11 @@ describe("loginErrorMessage", () => {
     expect(loginErrorMessage("access_denied")).toBe(
       "GitHub sign-in was cancelled or failed. Try again.",
     );
+  });
+});
+
+describe("GITHUB_OAUTH_SCOPES", () => {
+  it("requests repo access through an OAuth App", () => {
+    expect(GITHUB_OAUTH_SCOPES).toBe("repo read:user");
   });
 });

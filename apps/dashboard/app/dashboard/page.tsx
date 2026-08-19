@@ -16,7 +16,6 @@ import {
   Archive,
   ArrowRight,
   ChevronRight,
-  Github,
 } from "@workspace/ui/icons";
 
 type FilterMode = "turborepo" | "all";
@@ -31,14 +30,13 @@ export default function DashboardPage() {
 
   const {
     repositories,
-    needsInstallation,
     isLoading: loading,
     error: queryError,
   } = useRepositoriesQuery(!!user && !authLoading);
 
   const isAuthExpired =
     queryError instanceof GitHubAPIError &&
-    queryError.status === 401 &&
+    (queryError.status === 401 || queryError.status === 403) &&
     !(queryError instanceof GitHubRateLimitError);
 
   const errorBanner = (() => {
@@ -242,7 +240,9 @@ export default function DashboardPage() {
                 {filteredRepositories.length} {filteredRepositories.length === 1 ? "repository" : "repositories"}
               </span>
               <a
-                href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
+                href="https://github.com/settings/applications"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               >
                 Manage
@@ -362,42 +362,24 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Needs GitHub App installation */}
-        {!loading && !errorBanner && needsInstallation && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <Github className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
-            <p className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              Connect your repositories
-            </p>
-            <p className="mt-1 max-w-sm text-xs text-zinc-400 dark:text-zinc-500">
-              Install the TurboGraph app on your GitHub account to select which repositories you&apos;d like to access. Only read-only permissions are required.
-            </p>
-            <a
-              href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-medium text-zinc-900 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-700"
-            >
-              <Github className="h-3.5 w-3.5" />
-              Install GitHub App
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-        )}
-
-        {/* Empty: no repos at all (app installed but no repos selected) */}
-        {!loading && !errorBanner && !needsInstallation && repositories.length === 0 && (
+        {/* Empty: no repos */}
+        {!loading && !errorBanner && repositories.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Archive className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
             <p className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
               No repositories found
             </p>
-            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-              No repositories are selected. Update your GitHub App settings to add repositories.
+            <p className="mt-1 max-w-sm text-xs text-zinc-400 dark:text-zinc-500">
+              Repositories you own or collaborate on will appear here after you
+              authorize TurboGraph on GitHub.
             </p>
             <a
-              href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
+              href="https://github.com/settings/applications"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-900 underline underline-offset-2 hover:no-underline dark:text-zinc-100"
             >
-              Configure repositories
+              Manage GitHub authorization
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>

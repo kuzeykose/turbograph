@@ -82,27 +82,6 @@ export interface GitHubCommitDetail extends GitHubCommit {
   };
 }
 
-// GitHub App installation types
-export interface GitHubInstallation {
-  id: number;
-  app_id: number;
-  app_slug: string;
-  target_type: "User" | "Organization";
-  account: {
-    login: string;
-    avatar_url: string;
-    id: number;
-    type: string;
-  };
-  repository_selection: "all" | "selected";
-  permissions: Record<string, string>;
-}
-
-export interface GitHubInstallationRepositoriesResponse {
-  total_count: number;
-  repositories: GitHubRepository[];
-}
-
 // Request option types
 export interface GetContentsOptions {
   ref?: string; // Branch name or commit SHA

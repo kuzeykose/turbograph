@@ -9,6 +9,7 @@ import {
   buildOAuthCallbackUrl,
   getSafeRedirectPath,
   loginErrorMessage,
+  GITHUB_OAUTH_SCOPES,
 } from "@/lib/auth/redirect";
 
 function LoginForm() {
@@ -40,6 +41,7 @@ function LoginForm() {
         provider: "github",
         options: {
           redirectTo: buildOAuthCallbackUrl(window.location.origin, nextPath),
+          scopes: GITHUB_OAUTH_SCOPES,
         },
       });
 
@@ -69,7 +71,7 @@ function LoginForm() {
             Sign in with GitHub
           </h1>
           <p className="mt-1 text-base text-zinc-400 dark:text-zinc-500">
-            Higher API rate limits, private repos, and your own repository list.
+            Sign in once to list your repositories and raise GitHub API limits.
           </p>
         </div>
 
@@ -100,8 +102,8 @@ function LoginForm() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          Listing your repositories may ask you to install the TurboGraph GitHub
-          App. Public repos work after sign-in without it.
+          GitHub will ask you to authorize TurboGraph as an OAuth app. You can
+          revoke access anytime from GitHub Settings → Applications.
         </p>
       </div>
     </main>

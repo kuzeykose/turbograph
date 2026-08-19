@@ -1,5 +1,8 @@
 export const DEFAULT_POST_LOGIN_PATH = "/dashboard";
 
+/** GitHub OAuth App scopes requested at sign-in (Authorized OAuth Apps). */
+export const GITHUB_OAUTH_SCOPES = "repo read:user";
+
 /**
  * Accept only same-origin relative paths to avoid open redirects.
  * Rejects protocol-relative URLs, backslashes, and the site root (home
