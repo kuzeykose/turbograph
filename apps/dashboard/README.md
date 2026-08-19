@@ -19,34 +19,32 @@ This Next.js application demonstrates client-side GitHub OAuth authentication us
 
 - Node.js 18+ installed
 - A Supabase account ([sign up here](https://supabase.com))
-- A GitHub OAuth App configured
+- A GitHub App configured
 
 ## Setup Instructions
 
-### 1. Configure GitHub OAuth
+### 1. Configure the GitHub App
 
-1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
-2. Click "New OAuth App"
-3. Fill in the application details:
-   - **Application name**: Your app name
+1. Go to [GitHub Developer Settings](https://github.com/settings/apps) → **New GitHub App**
+2. Fill in the application details:
    - **Homepage URL**: `http://localhost:3000` (for development)
-   - **Authorization callback URL**: `http://localhost:3000/auth/callback`
-4. Click "Register application"
-5. Note down your **Client ID** and generate a **Client Secret**
+   - **Callback URL**: `https://<project-ref>.supabase.co/auth/v1/callback`
+     (copy this from Supabase → Authentication → Sign In / Providers → GitHub)
+   - Repository permissions: Contents (read-only), Metadata (read-only)
+3. Create the app, then generate a **Client secret**
+4. Note the **Client ID**, **Client secret**, and app **slug**
 
 ### 2. Configure Supabase
 
 1. Create a new project in [Supabase Dashboard](https://app.supabase.com)
-2. Go to **Authentication** > **Providers** > **GitHub**
+2. Go to **Authentication** > **Sign In / Providers** > **GitHub**
 3. Enable GitHub provider
-4. Enter your GitHub OAuth **Client ID** and **Client Secret**
-5. **Important**: Add the following scopes to access repositories:
-   - `repo` - Full control of private repositories
-   - Or use `public_repo` - Access to public repositories only
-6. Copy the **Callback URL** from Supabase (should be `https://<project-ref>.supabase.co/auth/v1/callback`)
-7. Go back to your GitHub OAuth App settings and add this as an additional callback URL
+4. Enter the GitHub App **Client ID** and **Client secret**
+5. Leave extra scopes **empty**. Do not add `repo` or `public_repo`.
+6. Add this app's callback to **Authentication** > **URL Configuration** > **Redirect URLs**:
+   `http://localhost:3000/auth/callback`
 
-**Note**: The `repo` scope is required to fetch repositories using the GitHub API. Without it, the repositories page will show an error.
+**Note**: Users sign in through this GitHub App, then install it and select which repositories TurboGraph can access.
 
 ### 3. Configure Environment Variables
 
@@ -59,6 +57,7 @@ This Next.js application demonstrates client-side GitHub OAuth authentication us
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+NEXT_PUBLIC_GITHUB_APP_SLUG=your-github-app-slug
 ```
 
 ### 4. Install Dependencies
@@ -101,11 +100,11 @@ Upload the entire `out/` directory to your static hosting provider:
 
 ### Production OAuth Configuration
 
-After deploying, update your OAuth callback URLs:
+After deploying, keep the GitHub App callback pointed at Supabase, and add the production app URL to Supabase:
 
-1. **GitHub OAuth App**: Add `https://yourdomain.com/auth/callback`
-2. **Supabase**: Add `https://yourdomain.com` to allowed redirect URLs
-   - Go to **Authentication** > **URL Configuration** in Supabase
+1. **GitHub App**: Callback URL stays `https://<project-ref>.supabase.co/auth/v1/callback`
+2. **Supabase**: Add `https://yourdomain.com/auth/callback` (and the site origin) to allowed redirect URLs
+   - Go to **Authentication** > **URL Configuration**
    - Add your production domain to **Redirect URLs**
 
 ## Application Structure
@@ -148,11 +147,10 @@ After deploying, update your OAuth callback URLs:
 ### Authentication Flow
 
 1. User clicks "Sign in with GitHub" on `/login`
-2. Redirected to GitHub OAuth consent screen
-3. After approval, GitHub redirects to `/auth/callback`
-4. Supabase extracts tokens and creates session
-5. Session stored in browser localStorage
-6. User redirected to `/dashboard`
+2. Supabase starts GitHub OAuth (`signInWithOAuth({ provider: "github" })`)
+3. GitHub redirects to `https://<project>.supabase.co/auth/v1/callback`
+4. Supabase creates the user session and redirects to `/auth/callback` with a code
+5. The app exchanges the code, stores the GitHub `provider_token`, and sends the user to `/dashboard`
 
 ### GitHub API Integration
 
@@ -231,7 +229,7 @@ The viewer uses the [GitHub Contents API](https://docs.github.com/en/rest/repos/
 ### Common Issues
 
 **Issue**: "Invalid redirect URL"
-- **Fix**: Add callback URL to both GitHub OAuth App and Supabase settings
+- **Fix**: Add the Supabase callback URL to the GitHub App and this app's `/auth/callback` to Supabase Redirect URLs
 
 **Issue**: Infinite redirect loop
 - **Fix**: Check AuthProvider is wrapping the app in `layout.tsx`

@@ -3,7 +3,9 @@
 import { useAuth } from "@/contexts/auth-context";
 import { useRepositoryContext } from "@/contexts/repository-context";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Info } from "@workspace/ui/icons";
+import { buildLoginUrl, pathWithSearch } from "@/lib/auth/redirect";
 import { RepositorySidebar } from "@/components/repository-sidebar";
 import { FilesTab } from "@/components/files-tab";
 import { CommitsTab } from "@/components/commits-tab";
@@ -17,6 +19,11 @@ import { useImpactAnalysis } from "@/hooks/use-impact-analysis";
 
 export default function RepositoryPage() {
   const { user, loading: authLoading } = useAuth();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const loginHref = buildLoginUrl(
+    pathWithSearch(pathname, searchParams.toString()),
+  );
   const {
     owner,
     repo,
@@ -41,7 +48,12 @@ export default function RepositoryPage() {
     loading: filesLoading,
     error: filesError,
     handleFileClick,
-  } = useFileNavigation({ owner, repo, branch });
+  } = useFileNavigation({
+    owner,
+    repo,
+    branch,
+    enabled: activeTab === "files",
+  });
 
   const {
     commits,
@@ -126,11 +138,11 @@ export default function RepositoryPage() {
                 <div>
                   <p className="font-medium">Viewing as guest</p>
                   <p className="mt-1">
-                    You're viewing this repository without authentication.
+                    You are viewing this repository without authentication.
                     GitHub API has rate limits for unauthenticated requests (60
                     requests per hour).{" "}
                     <Link
-                      href="/login"
+                      href={loginHref}
                       className="font-medium underline hover:no-underline"
                     >
                       Sign in

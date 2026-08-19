@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from "react";
 import { CodeViewer } from "@/components/code-viewer";
 import { formatFileSize } from "@/lib/utils/format";
+import { getLanguageFromFilename } from "@/lib/utils/language";
 import { githubService } from "@/lib/services/github";
 import { ContentItem, FileContent } from "@/types/repository";
 import {
@@ -47,35 +48,6 @@ function getFileIcon(type: string, name: string, isExpanded?: boolean) {
     );
   }
   return <File className="h-4 w-4 flex-shrink-0 text-zinc-500" />;
-}
-
-function getLanguageFromFilename(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase();
-  const languageMap: Record<string, string> = {
-    js: "javascript",
-    jsx: "javascript",
-    ts: "typescript",
-    tsx: "typescript",
-    py: "python",
-    rb: "ruby",
-    java: "java",
-    go: "go",
-    rs: "rust",
-    cpp: "cpp",
-    c: "c",
-    h: "c",
-    css: "css",
-    scss: "scss",
-    html: "html",
-    json: "json",
-    md: "markdown",
-    yml: "yaml",
-    yaml: "yaml",
-    xml: "xml",
-    sh: "shell",
-    bash: "shell",
-  };
-  return languageMap[ext || ""] || "plaintext";
 }
 
 function sortContents(items: ContentItem[]): ContentItem[] {

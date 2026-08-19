@@ -1,56 +1,78 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/auth-context";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Github } from "@workspace/ui/icons";
+import {
+  buildOAuthCallbackUrl,
+  getSafeRedirectPath,
+  loginErrorMessage,
+} from "@/lib/auth/redirect";
 
-export default function LoginPage() {
+function LoginForm() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const [actionError, setActionError] = useState<string | null | undefined>(
+    undefined,
+  );
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = getSafeRedirectPath(searchParams.get("next"));
+  const urlError = loginErrorMessage(searchParams.get("error"));
+  const error = actionError !== undefined ? actionError : urlError;
 
   useEffect(() => {
-    if (user) {
-      router.push("/dashboard");
+    if (!authLoading && user) {
+      router.replace(nextPath);
     }
-  }, [user, router]);
+  }, [user, authLoading, router, nextPath]);
 
   const handleGitHubSignIn = async () => {
     try {
       setLoading(true);
-      setError(null);
+      setActionError(null);
 
       const supabase = createSupabaseBrowserClient();
 
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Supabase GitHub provider uses the GitHub App client ID/secret.
+      // Do not pass OAuth App scopes — repo access is granted when the user
+      // installs the GitHub App and selects repositories.
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: buildOAuthCallbackUrl(window.location.origin, nextPath),
         },
       });
 
-      if (error) {
-        setError(error.message);
+      if (oauthError) {
+        setActionError(oauthError.message);
         setLoading(false);
       }
-    } catch (_err) {
-      setError("An unexpected error occurred");
+    } catch {
+      setActionError("An unexpected error occurred");
       setLoading(false);
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <main className="flex flex-1 items-center justify-center overflow-auto">
+        <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-zinc-100" />
+      </main>
+    );
+  }
 
   return (
     <main className="flex flex-1 items-center justify-center overflow-auto">
       <div className="w-full max-w-sm px-6">
         <div className="text-center">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-            Welcome
+            Sign in with GitHub
           </h1>
           <p className="mt-1 text-base text-zinc-400 dark:text-zinc-500">
-            Sign in to your account to continue
+            Sign in with GitHub, then choose which repositories to connect.
           </p>
         </div>
 
@@ -81,9 +103,24 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          By signing in, you agree to our Terms of Service and Privacy Policy
+          Repository access is not granted at sign-in. You select specific
+          repositories after logging in.
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex flex-1 items-center justify-center overflow-auto">
+          <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-zinc-100" />
+        </main>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
