@@ -54,9 +54,9 @@ export function RepositoryProvider({
   const repo = params.repo as string;
   const branch = searchParams.get("branch") || undefined;
 
-  // Tab state - read from URL or default to "files"
+  // Tab state - read from URL or default to "turborepo"
   const tabFromUrl = searchParams.get("tab") as TabValue | null;
-  const [activeTab, setActiveTabState] = useState<TabValue>(
+  const [activeTabState, setActiveTabState] = useState<TabValue>(
     tabFromUrl && ["files", "commits", "turborepo", "packages", "analysis"].includes(tabFromUrl)
       ? tabFromUrl
       : "turborepo"
@@ -103,13 +103,19 @@ export function RepositoryProvider({
 
   // Sync tab state when URL changes externally
   useEffect(() => {
-    const tabFromUrl = searchParams.get("tab") as TabValue | null;
+    const nextTabFromUrl = searchParams.get("tab") as TabValue | null;
     const newTab =
-      tabFromUrl && ["files", "commits", "turborepo", "packages", "analysis"].includes(tabFromUrl)
-        ? tabFromUrl
+      nextTabFromUrl && ["files", "commits", "turborepo", "packages", "analysis"].includes(nextTabFromUrl)
+        ? nextTabFromUrl
         : "turborepo";
     setActiveTabState(newTab);
   }, [searchParams]);
+
+  // Non-Turborepo repos have no graph tabs — open Files instead of an empty view
+  const activeTab: TabValue =
+    !turborepoLoading && turborepoStructure && !turborepoStructure.isTurborepo
+      ? "files"
+      : activeTabState;
 
   return (
     <RepositoryContext.Provider

@@ -41,7 +41,12 @@ export default function RepositoryPage() {
     loading: filesLoading,
     error: filesError,
     handleFileClick,
-  } = useFileNavigation({ owner, repo, branch });
+  } = useFileNavigation({
+    owner,
+    repo,
+    branch,
+    enabled: activeTab === "files",
+  });
 
   const {
     commits,

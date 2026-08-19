@@ -1,7 +1,15 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Check, Copy, FileText } from '@workspace/ui/icons';
+import { useState, useSyncExternalStore } from "react";
+import { useTheme } from "next-themes";
+import { Check, Copy, FileText } from "@workspace/ui/icons";
+import {
+  SyntaxHighlighter,
+  oneDark,
+  oneLight,
+} from "@/components/syntax-highlighter";
+
+const emptySubscribe = () => () => {};
 
 interface CodeViewerProps {
   content: string;
@@ -11,8 +19,15 @@ interface CodeViewerProps {
 
 export function CodeViewer({ content, filename, language }: CodeViewerProps) {
   const [copied, setCopied] = useState(false);
-  const lines = content.split('\n');
-  const isBinary = content === '[Binary file - cannot display]';
+  const isClient = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+  const { resolvedTheme } = useTheme();
+  const lines = content.split("\n");
+  const isBinary = content === "[Binary file - cannot display]";
+  const highlighterLanguage = language === "text" ? "text" : language;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
@@ -29,7 +44,7 @@ export function CodeViewer({ content, filename, language }: CodeViewerProps) {
               {filename}
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-500">
-              {isBinary ? 'Binary file' : `${lines.length} lines · ${language}`}
+              {isBinary ? "Binary file" : `${lines.length} lines · ${language}`}
             </p>
           </div>
           {!isBinary && (
@@ -65,24 +80,31 @@ export function CodeViewer({ content, filename, language }: CodeViewerProps) {
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <tbody>
-              {lines.map((line, index) => (
-                <tr key={index} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                  <td className="w-16 select-none border-r border-zinc-200 bg-zinc-50 px-4 py-0.5 text-right font-mono text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-500">
-                    {index + 1}
-                  </td>
-                  <td className="px-4 py-0.5">
-                    <pre className="font-mono text-sm text-zinc-900 dark:text-zinc-100">
-                      {line || ' '}
-                    </pre>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SyntaxHighlighter
+          language={highlighterLanguage}
+          style={isClient && resolvedTheme === "dark" ? oneDark : oneLight}
+          showLineNumbers
+          wrapLongLines={false}
+          customStyle={{
+            margin: 0,
+            padding: "0.75rem 0",
+            background: "transparent",
+            fontSize: "0.875rem",
+            lineHeight: 1.6,
+          }}
+          lineNumberStyle={{
+            minWidth: "3.5rem",
+            paddingRight: "1rem",
+            paddingLeft: "1rem",
+            color: "#71717a",
+            userSelect: "none",
+          }}
+          codeTagProps={{
+            className: "font-mono text-sm",
+          }}
+        >
+          {content}
+        </SyntaxHighlighter>
       )}
     </div>
   );
