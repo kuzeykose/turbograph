@@ -225,31 +225,48 @@ class GitHubService {
   }
 
   /**
-   * Get user repositories
+   * Get repositories visible to the authorized OAuth user.
+   * Paginates `/user/repos` unless a specific page is requested.
    */
   async getUserRepositories(
     options?: GetUserRepositoriesOptions,
   ): Promise<GitHubRepository[]> {
-    // This endpoint requires authentication
     await this.ensureAuthenticated();
 
-    const params = new URLSearchParams();
-    if (options?.sort) params.append("sort", options.sort);
-    if (options?.direction) params.append("direction", options.direction);
-    if (options?.perPage) params.append("per_page", options.perPage.toString());
-    if (options?.page) params.append("page", options.page.toString());
-    if (options?.type) params.append("type", options.type);
+    const allRepos: GitHubRepository[] = [];
+    let page = options?.page ?? 1;
+    const perPage = options?.perPage || 100;
+    const fetchAll = options?.page === undefined;
 
-    const queryString = params.toString();
-    const endpoint = `/user/repos${queryString ? `?${queryString}` : ""}`;
+    while (true) {
+      const params = new URLSearchParams();
+      if (options?.sort) params.append("sort", options.sort);
+      if (options?.direction) params.append("direction", options.direction);
+      params.append("per_page", perPage.toString());
+      params.append("page", page.toString());
+      if (options?.type) params.append("type", options.type);
 
-    const response = await this.request(endpoint);
-    return await response.json();
+      const response = await this.request(`/user/repos?${params.toString()}`);
+      const repos: GitHubRepository[] = await response.json();
+      allRepos.push(...repos);
+
+      if (!fetchAll) {
+        break;
+      }
+
+      const { hasMore } = this.parseLinkHeader(response.headers.get("Link"));
+      if (!hasMore || repos.length === 0) {
+        break;
+      }
+
+      page++;
+    }
+
+    return allRepos;
   }
 
   /**
    * Get the user's GitHub App installations.
-   * Returns installations of the TurboGraph app for the authenticated user.
    */
   async getUserInstallations(): Promise<GitHubInstallation[]> {
     await this.ensureAuthenticated();
@@ -260,8 +277,7 @@ class GitHubService {
   }
 
   /**
-   * Get repositories accessible through a specific GitHub App installation.
-   * Handles pagination to fetch all repositories.
+   * Get repositories the user selected for a GitHub App installation.
    */
   async getInstallationRepositories(
     installationId: number,
@@ -294,8 +310,7 @@ class GitHubService {
   }
 
   /**
-   * Get all repositories the user has granted access to via GitHub App installations.
-   * Aggregates repos across all installations.
+   * Repositories the user granted through GitHub App installations.
    */
   async getAccessibleRepositories(
     options?: { sort?: string },

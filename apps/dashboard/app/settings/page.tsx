@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
+import { buildLoginUrl } from "@/lib/auth/redirect";
 import { Folder, ChevronRight, Github } from "@workspace/ui/icons";
 
 export default function SettingsPage() {
@@ -11,7 +12,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/login");
+      router.replace(buildLoginUrl("/settings"));
     }
   }, [user, loading, router]);
 

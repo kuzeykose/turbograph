@@ -104,16 +104,29 @@ A Next.js web application for exploring GitHub repositories and visualizing Turb
 
 ### Setup
 
-1. **Create a Supabase project** and enable the GitHub OAuth provider. Add scopes `repo` or `public_repo` depending on your needs.
+Sign-in is **Supabase Auth + a GitHub App**. Put the GitHub App Client ID and Secret in Supabase. Users then install the app and pick repositories — nothing is granted by default.
 
-2. **Configure environment variables** in `apps/dashboard/.env.local`:
+1. **Create a GitHub App** at [GitHub Developer Settings](https://github.com/settings/apps) → **New GitHub App**.
+   - Homepage URL: `http://localhost:3000` (and your production origin later)
+   - **Callback URL** (Identifying and authorizing users): `https://<project-ref>.supabase.co/auth/v1/callback`
+   - Enable **Request user authorization (OAuth) during installation** only if you want install + sign-in on one screen
+   - Repository permissions: Contents (read-only), Metadata (read-only)
+   - Where can this GitHub App be installed: Any account
+
+2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the GitHub App **Client ID** and **Client secret**. Leave extra scopes **empty**.
+
+3. **Allow the app callback** in Supabase (Authentication → URL Configuration → Redirect URLs):
+   `http://localhost:3000/auth/callback` (and `https://your-domain/auth/callback` in production)
+
+4. **Configure environment variables** in `apps/dashboard/.env.local`:
 
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   NEXT_PUBLIC_GITHUB_APP_SLUG=your-github-app-slug
    ```
 
-3. **Run the dashboard:**
+5. **Run the dashboard:**
 
    ```bash
    pnpm dev --filter turbograph-dashboard
@@ -126,7 +139,7 @@ A Next.js web application for exploring GitHub repositories and visualizing Turb
 - **Commit history** -- paginated commit log with branch selection
 - **Dependency graph** -- interactive visualization of Turborepo workspace dependencies (graph and list views)
 - **Impact analysis** -- trace how changes propagate through the dependency tree
-- **GitHub OAuth** -- sign in for higher API rate limits and access to private repos
+- **GitHub App** -- sign in through Supabase, then pick which repositories to connect
 
 ## Tech stack
 
@@ -137,7 +150,7 @@ A Next.js web application for exploring GitHub repositories and visualizing Turb
 | CLI | Commander.js, tsup |
 | Web framework | Next.js 16 (App Router) |
 | UI | React 19, Tailwind CSS, Radix UI, shadcn/ui |
-| Auth | Supabase (GitHub OAuth) |
+| Auth | Supabase (GitHub App) |
 | API | GitHub REST API |
 | Testing | Jest, React Testing Library |
 | Code quality | ESLint, Prettier |

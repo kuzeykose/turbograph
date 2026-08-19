@@ -6,7 +6,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { useRepositoriesQuery } from "@/hooks/use-repositories-query";
 import { getLanguageColor } from "@/lib/utils/language-colors";
 import Link from "next/link";
-import { GitHubAPIError } from "@/types/github";
+import { GitHubAPIError, GitHubRateLimitError } from "@/types/github";
+import { buildLoginUrl } from "@/lib/auth/redirect";
+import { githubAppInstallUrl } from "@/lib/auth/github-app";
 import {
   Search,
   ExternalLink,
@@ -26,6 +28,7 @@ export default function DashboardPage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterMode>("turborepo");
+  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const {
     repositories,
@@ -34,31 +37,80 @@ export default function DashboardPage() {
     error: queryError,
   } = useRepositoriesQuery(!!user && !authLoading);
 
-  // Handle auth errors
-  const error = queryError
-    ? queryError instanceof GitHubAPIError &&
-      (queryError.status === 401 || queryError.status === 403)
-      ? "Your GitHub session has expired. Please sign out and sign back in to refresh your access."
-      : queryError instanceof Error
-        ? queryError.message
-        : "Failed to fetch repositories"
-    : null;
+  const isAuthExpired =
+    queryError instanceof GitHubAPIError &&
+    (queryError.status === 401 || queryError.status === 403) &&
+    !(queryError instanceof GitHubRateLimitError);
+
+  const errorBanner = (() => {
+    if (refreshError) {
+      return { text: refreshError, tone: "error" as const, showSignOut: true };
+    }
+
+    if (queryError instanceof GitHubRateLimitError) {
+      return {
+        text: `GitHub API rate limit exceeded. Try again after ${queryError.resetAt.toLocaleTimeString()}.`,
+        tone: "error" as const,
+        showSignOut: false,
+      };
+    }
+
+    if (isAuthExpired) {
+      return {
+        text: "Reconnecting to GitHub\u2026",
+        tone: "info" as const,
+        showSignOut: false,
+      };
+    }
+
+    if (queryError instanceof Error) {
+      return {
+        text: queryError.message,
+        tone: "error" as const,
+        showSignOut: false,
+      };
+    }
+
+    if (queryError) {
+      return {
+        text: "Failed to fetch repositories",
+        tone: "error" as const,
+        showSignOut: false,
+      };
+    }
+
+    return null;
+  })();
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push("/login");
+      router.replace(buildLoginUrl("/dashboard"));
     }
   }, [user, authLoading, router]);
 
-  // Attempt token refresh on auth errors
   useEffect(() => {
-    if (
-      queryError instanceof GitHubAPIError &&
-      (queryError.status === 401 || queryError.status === 403)
-    ) {
-      refreshGitHubToken("/dashboard").catch(() => {});
+    if (!isAuthExpired) {
+      return;
     }
-  }, [queryError, refreshGitHubToken]);
+
+    let cancelled = false;
+
+    refreshGitHubToken("/dashboard").catch((err: unknown) => {
+      if (cancelled) {
+        return;
+      }
+
+      setRefreshError(
+        err instanceof Error
+          ? err.message
+          : "GitHub token refresh failed. Please sign out and sign in again.",
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthExpired, refreshGitHubToken]);
 
   const parseGitHubUrl = (
     url: string,
@@ -162,7 +214,7 @@ export default function DashboardPage() {
         </form>
 
         {/* Your repositories - filter tabs + count */}
-        {!loading && !error && repositories.length > 0 && (
+        {!loading && !errorBanner && repositories.length > 0 && (
           <div className="mb-5 flex items-center justify-between">
             <div className="flex items-center gap-1 rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-900">
               <button
@@ -191,7 +243,7 @@ export default function DashboardPage() {
                 {filteredRepositories.length} {filteredRepositories.length === 1 ? "repository" : "repositories"}
               </span>
               <a
-                href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
+                href={githubAppInstallUrl()}
                 className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
               >
                 Manage
@@ -201,11 +253,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
-            <p>{error}</p>
-            {error.includes("sign out") && (
+        {/* Error / reconnect */}
+        {errorBanner && (
+          <div
+            className={
+              errorBanner.tone === "info"
+                ? "mb-6 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300"
+                : "mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+            }
+          >
+            <p>{errorBanner.text}</p>
+            {errorBanner.showSignOut && (
               <button
                 onClick={signOut}
                 className="mt-2 text-xs font-medium underline underline-offset-2 hover:no-underline"
@@ -217,7 +275,7 @@ export default function DashboardPage() {
         )}
 
         {/* Loading skeletons */}
-        {loading && !error && (
+        {loading && !errorBanner && (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
@@ -237,7 +295,7 @@ export default function DashboardPage() {
         )}
 
         {/* Repository grid */}
-        {!loading && !error && filteredRepositories.length > 0 && (
+        {!loading && !errorBanner && filteredRepositories.length > 0 && (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filteredRepositories.map((repo) => (
               <Link
@@ -305,42 +363,44 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Needs GitHub App installation */}
-        {!loading && !error && needsInstallation && (
+        {/* Needs GitHub App installation — user selects repositories */}
+        {!loading && !errorBanner && needsInstallation && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Github className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
             <p className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              Connect your repositories
+              Select repositories
             </p>
             <p className="mt-1 max-w-sm text-xs text-zinc-400 dark:text-zinc-500">
-              Install the TurboGraph app on your GitHub account to select which repositories you&apos;d like to access. Only read-only permissions are required.
+              Choose which repositories TurboGraph can access. On GitHub, pick
+              &quot;Only select repositories&quot; — nothing is granted by default.
             </p>
             <a
-              href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
+              href={githubAppInstallUrl()}
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-4 py-2 text-xs font-medium text-zinc-900 transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-700"
             >
               <Github className="h-3.5 w-3.5" />
-              Install GitHub App
+              Choose repositories
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         )}
 
-        {/* Empty: no repos at all (app installed but no repos selected) */}
-        {!loading && !error && !needsInstallation && repositories.length === 0 && (
+        {/* Empty: app installed but no repos selected */}
+        {!loading && !errorBanner && !needsInstallation && repositories.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <Archive className="h-8 w-8 text-zinc-300 dark:text-zinc-600" />
             <p className="mt-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-              No repositories found
+              No repositories selected
             </p>
-            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-              No repositories are selected. Update your GitHub App settings to add repositories.
+            <p className="mt-1 max-w-sm text-xs text-zinc-400 dark:text-zinc-500">
+              Add the repositories you want to analyze in your GitHub App
+              settings.
             </p>
             <a
-              href={`https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new`}
+              href={githubAppInstallUrl()}
               className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-900 underline underline-offset-2 hover:no-underline dark:text-zinc-100"
             >
-              Configure repositories
+              Select repositories
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
@@ -348,7 +408,7 @@ export default function DashboardPage() {
 
         {/* Empty: no turborepo projects */}
         {!loading &&
-          !error &&
+          !errorBanner &&
           repositories.length > 0 &&
           filteredRepositories.length === 0 &&
           filter === "turborepo" && (
