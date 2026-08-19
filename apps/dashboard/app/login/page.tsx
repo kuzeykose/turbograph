@@ -103,8 +103,8 @@ function LoginForm() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          GitHub will ask you to authorize repository access. You can revoke it
-          anytime from GitHub Settings → Applications.
+          GitHub will ask for access to your public repositories. You can revoke
+          it anytime from GitHub Settings → Applications.
         </p>
       </div>
     </main>

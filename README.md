@@ -111,7 +111,7 @@ Sign-in is **Supabase Auth with the GitHub OAuth provider**. Users are GitHub OA
    - **Authorization callback URL** must be the Supabase callback, not this app:
      `https://<project-ref>.supabase.co/auth/v1/callback`
 
-2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Add scopes `repo` and `read:user`.
+2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Set scopes to `public_repo read:user` (do not use `repo`, which asks for private repositories).
 
 3. **Allow the app callback** in Supabase (Authentication → URL Configuration → Redirect URLs):
    `http://localhost:3000/auth/callback` (and `https://your-domain/auth/callback` in production)
@@ -136,7 +136,7 @@ Sign-in is **Supabase Auth with the GitHub OAuth provider**. Users are GitHub OA
 - **Commit history** -- paginated commit log with branch selection
 - **Dependency graph** -- interactive visualization of Turborepo workspace dependencies (graph and list views)
 - **Impact analysis** -- trace how changes propagate through the dependency tree
-- **GitHub OAuth** -- sign in for higher API rate limits and access to private repos
+- **GitHub OAuth** -- sign in for higher API rate limits and your public repositories
 
 ## Tech stack
 
