@@ -1,13 +1,6 @@
 export const DEFAULT_POST_LOGIN_PATH = "/dashboard";
 
 /**
- * Identity-only scopes for Supabase GitHub OAuth.
- * Do not request `repo` or `public_repo` here — users pick repositories
- * themselves by installing the GitHub App.
- */
-export const GITHUB_OAUTH_SCOPES = "user:email";
-
-/**
  * Accept only same-origin relative paths to avoid open redirects.
  * Rejects protocol-relative URLs, backslashes, and the site root (home
  * should land on the dashboard after sign-in).

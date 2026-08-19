@@ -104,14 +104,16 @@ A Next.js web application for exploring GitHub repositories and visualizing Turb
 
 ### Setup
 
-Sign-in is **Supabase Auth with the GitHub OAuth provider**. That step only identifies the user. Repositories are chosen afterward with the TurboGraph GitHub App — users pick specific repos; nothing is granted by default.
+Sign-in is **Supabase Auth + a GitHub App**. Put the GitHub App Client ID and Secret in Supabase. Users then install the app and pick repositories — nothing is granted by default.
 
-1. **Create a GitHub OAuth App** (not a GitHub App) at [GitHub Developer Settings](https://github.com/settings/developers) → **OAuth Apps** → **New OAuth App**.
+1. **Create a GitHub App** at [GitHub Developer Settings](https://github.com/settings/apps) → **New GitHub App**.
    - Homepage URL: `http://localhost:3000` (and your production origin later)
-   - **Authorization callback URL** must be the Supabase callback, not this app:
-     `https://<project-ref>.supabase.co/auth/v1/callback`
+   - **Callback URL** (Identifying and authorizing users): `https://<project-ref>.supabase.co/auth/v1/callback`
+   - Enable **Request user authorization (OAuth) during installation** only if you want install + sign-in on one screen
+   - Repository permissions: Contents (read-only), Metadata (read-only)
+   - Where can this GitHub App be installed: Any account
 
-2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Leave extra scopes empty (or `user:email` only). Do **not** add `repo` or `public_repo`.
+2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the GitHub App **Client ID** and **Client secret**. Leave extra scopes **empty**.
 
 3. **Allow the app callback** in Supabase (Authentication → URL Configuration → Redirect URLs):
    `http://localhost:3000/auth/callback` (and `https://your-domain/auth/callback` in production)
@@ -137,7 +139,7 @@ Sign-in is **Supabase Auth with the GitHub OAuth provider**. That step only iden
 - **Commit history** -- paginated commit log with branch selection
 - **Dependency graph** -- interactive visualization of Turborepo workspace dependencies (graph and list views)
 - **Impact analysis** -- trace how changes propagate through the dependency tree
-- **GitHub OAuth** -- sign in for identity and higher API rate limits; pick repositories via the GitHub App
+- **GitHub App** -- sign in through Supabase, then pick which repositories to connect
 
 ## Tech stack
 
@@ -148,7 +150,7 @@ Sign-in is **Supabase Auth with the GitHub OAuth provider**. That step only iden
 | CLI | Commander.js, tsup |
 | Web framework | Next.js 16 (App Router) |
 | UI | React 19, Tailwind CSS, Radix UI, shadcn/ui |
-| Auth | Supabase (GitHub OAuth) |
+| Auth | Supabase (GitHub App) |
 | API | GitHub REST API |
 | Testing | Jest, React Testing Library |
 | Code quality | ESLint, Prettier |

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { buildOAuthCallbackUrl, getSafeRedirectPath, GITHUB_OAUTH_SCOPES } from "@/lib/auth/redirect";
+import { buildOAuthCallbackUrl, getSafeRedirectPath } from "@/lib/auth/redirect";
 import {
   serializeClearedGitHubProviderTokenCookie,
   serializeGitHubProviderTokenCookie,
@@ -98,9 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
-        // Same Supabase GitHub OAuth sign-in, used to mint a fresh provider_token.
         redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectPath),
-        scopes: GITHUB_OAUTH_SCOPES,
       },
     });
   };

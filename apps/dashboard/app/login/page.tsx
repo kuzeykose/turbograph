@@ -9,7 +9,6 @@ import {
   buildOAuthCallbackUrl,
   getSafeRedirectPath,
   loginErrorMessage,
-  GITHUB_OAUTH_SCOPES,
 } from "@/lib/auth/redirect";
 
 function LoginForm() {
@@ -37,12 +36,13 @@ function LoginForm() {
 
       const supabase = createSupabaseBrowserClient();
 
-      // Identity is created by Supabase Auth. GitHub is only the OAuth provider.
+      // Supabase GitHub provider uses the GitHub App client ID/secret.
+      // Do not pass OAuth App scopes — repo access is granted when the user
+      // installs the GitHub App and selects repositories.
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
           redirectTo: buildOAuthCallbackUrl(window.location.origin, nextPath),
-          scopes: GITHUB_OAUTH_SCOPES,
         },
       });
 
@@ -72,7 +72,7 @@ function LoginForm() {
             Sign in with GitHub
           </h1>
           <p className="mt-1 text-base text-zinc-400 dark:text-zinc-500">
-            Sign in with your GitHub account. You will pick repositories next.
+            Sign in with GitHub, then choose which repositories to connect.
           </p>
         </div>
 
@@ -103,8 +103,8 @@ function LoginForm() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          Sign-in only uses your GitHub identity. Repository access is selected
-          separately after you log in.
+          Repository access is not granted at sign-in. You select specific
+          repositories after logging in.
         </p>
       </div>
     </main>
