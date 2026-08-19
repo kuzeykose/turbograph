@@ -15,6 +15,7 @@ import {
 } from "@/hooks/use-repository-query";
 import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { Repository } from "@/types/repository";
+import type { ImportFileNode } from "@workspace/graph";
 
 type TabValue =
   | "files"
@@ -35,6 +36,7 @@ interface RepositoryContextType {
   turborepoStructure: TurborepoStructure | null;
   dependencyGraph: DependencyEdge[];
   importGraph: DependencyEdge[];
+  importFiles: ImportFileNode[];
   importGraphLoading: boolean;
   importGraphTruncated: boolean;
   importGraphScannedFiles: number;
@@ -111,6 +113,7 @@ export function RepositoryProvider({
   );
 
   const importGraph = importGraphData?.edges ?? [];
+  const importFiles = importGraphData?.files ?? [];
   const importGraphTruncated = importGraphData?.truncated ?? false;
   const importGraphScannedFiles = importGraphData?.scannedFiles ?? 0;
   const importGraphError = importGraphQueryError
@@ -163,6 +166,7 @@ export function RepositoryProvider({
         turborepoStructure,
         dependencyGraph,
         importGraph,
+        importFiles,
         importGraphLoading,
         importGraphTruncated,
         importGraphScannedFiles,

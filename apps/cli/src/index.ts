@@ -9,6 +9,7 @@ import {
   buildImportGraph,
   calculateGraphLayout,
   generateSvgDocument,
+  importFilesToLayoutNodes,
 } from "@workspace/graph";
 import {
   analyzeTurborepo,
@@ -29,7 +30,7 @@ program
   .option("-h, --height <number>", "SVG height in pixels", "550")
   .option("--no-grid", "Disable grid background")
   .option("-d, --dir <path>", "Root directory of the turborepo", process.cwd())
-  .option("--imports", "Graph actual import usage instead of package.json")
+  .option("--imports", "Graph file-to-file import usage instead of package.json")
   .action(async (options) => {
     const rootDir = path.resolve(options.dir);
 
@@ -60,7 +61,7 @@ program
     );
 
     // Build dependency graph
-    const dependencies = options.imports
+    const importGraph = options.imports
       ? buildImportGraph(
           await collectImportSourceFiles(rootDir, [
             ...structure.apps.map((pkg) => pkg.path),
@@ -69,6 +70,14 @@ program
           structure.apps,
           structure.packages
         )
+      : null;
+
+    const layoutPackages = importGraph
+      ? importFilesToLayoutNodes(importGraph.files)
+      : { apps: structure.apps, packages: structure.packages };
+
+    const dependencies = importGraph
+      ? importGraph.edges
       : buildDependencyGraph(
           structure.apps,
           structure.packages,
@@ -78,7 +87,7 @@ program
     console.log(
       chalk.green(
         options.imports
-          ? `✓ Found ${dependencies.length} import edges`
+          ? `✓ Found ${importGraph?.files.length ?? 0} files and ${dependencies.length} import edges`
           : `✓ Found ${dependencies.length} dependencies`
       )
     );
@@ -87,8 +96,8 @@ program
     const width = parseInt(options.width, 10);
     const height = parseInt(options.height, 10);
     const { nodes, edges } = calculateGraphLayout(
-      structure.apps,
-      structure.packages,
+      layoutPackages.apps,
+      layoutPackages.packages,
       dependencies,
       { width, height }
     );

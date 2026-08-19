@@ -1,4 +1,9 @@
-import type { DependencyEdge, PackageInfo } from "./types";
+import type {
+  DependencyEdge,
+  ImportFileNode,
+  ImportGraph,
+  PackageInfo,
+} from "./types";
 import { posixDirname, toPosixPath } from "./analyze";
 
 export const MAX_IMPORT_SOURCE_FILES = 1500;
@@ -199,11 +204,88 @@ function packageOwningPath(
   return null;
 }
 
-function resolveSpecifierToPackage(
+const RESOLVE_EXTENSIONS = [
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".cts",
+  ".js",
+  ".jsx",
+  ".mjs",
+  ".cjs",
+] as const;
+
+function hasSourceExtension(filePath: string): boolean {
+  return SOURCE_EXT_RE.test(filePath);
+}
+
+function matchExistingFile(
+  candidate: string,
+  fileSet: Set<string>,
+): string | null {
+  const normalized = toPosixPath(candidate);
+  if (fileSet.has(normalized)) {
+    return normalized;
+  }
+
+  if (!hasSourceExtension(normalized)) {
+    for (const ext of RESOLVE_EXTENSIONS) {
+      const withExt = `${normalized}${ext}`;
+      if (fileSet.has(withExt)) {
+        return withExt;
+      }
+    }
+
+    for (const ext of RESOLVE_EXTENSIONS) {
+      const indexFile = `${normalized}/index${ext}`;
+      if (fileSet.has(indexFile)) {
+        return indexFile;
+      }
+    }
+  }
+
+  return null;
+}
+
+function resolveRelativeFile(
+  fromFile: string,
+  specifier: string,
+  fileSet: Set<string>,
+): string | null {
+  const resolved = posixJoinResolve(posixDirname(fromFile), specifier);
+  return matchExistingFile(resolved, fileSet);
+}
+
+function resolveInsidePackage(
+  pkg: PackageInfo,
+  subpath: string,
+  fileSet: Set<string>,
+): string | null {
+  const remainder = subpath.replace(/^\.\/+/, "");
+  const bases = remainder
+    ? [`${pkg.path}/${remainder}`, `${pkg.path}/src/${remainder}`]
+    : [pkg.path, `${pkg.path}/src`, `${pkg.path}/index`, `${pkg.path}/src/index`];
+
+  for (const base of bases) {
+    const match = matchExistingFile(base, fileSet);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Resolve an import specifier to a workspace source file path, if it exists
+ * in `fileSet`.
+ */
+export function resolveImportToFile(
   fromFile: string,
   specifier: string,
   packages: PackageInfo[],
-): PackageInfo | null {
+  fileSet: Set<string>,
+): string | null {
   if (
     specifier.startsWith("node:") ||
     specifier.startsWith("http:") ||
@@ -213,65 +295,122 @@ function resolveSpecifierToPackage(
     return null;
   }
 
+  const owner = packageOwningPath(fromFile, packages);
+
   if (isRelativeSpecifier(specifier)) {
-    const resolved = posixJoinResolve(posixDirname(fromFile), specifier);
-    const withoutExt = resolved.replace(/\.(?:[cm]?[jt]sx?)$/, "");
-    return (
-      packageOwningPath(withoutExt, packages) ??
-      packageOwningPath(resolved, packages)
-    );
+    return resolveRelativeFile(fromFile, specifier, fileSet);
+  }
+
+  // `@/foo` and `~/foo` are treated as aliases of the owning package root.
+  if (owner && (specifier.startsWith("@/") || specifier.startsWith("~/"))) {
+    return resolveInsidePackage(owner, specifier.slice(2), fileSet);
   }
 
   for (const pkg of packages) {
-    if (specifier === pkg.name || specifier.startsWith(`${pkg.name}/`)) {
-      return pkg;
+    if (specifier === pkg.name) {
+      return resolveInsidePackage(pkg, "", fileSet);
+    }
+    if (specifier.startsWith(`${pkg.name}/`)) {
+      return resolveInsidePackage(
+        pkg,
+        specifier.slice(pkg.name.length + 1),
+        fileSet,
+      );
     }
   }
 
   return null;
 }
 
+function packageKind(
+  pkg: PackageInfo,
+  apps: PackageInfo[],
+): "app" | "package" {
+  return apps.some((app) => app.name === pkg.name) ? "app" : "package";
+}
+
 /**
- * Build package-level import edges from an in-memory source map.
+ * Convert file nodes into the apps/packages shape the existing layout uses.
+ * `PackageInfo.name` is the file path so each file is a distinct node.
+ */
+export function importFilesToLayoutNodes(files: ImportFileNode[]): {
+  apps: PackageInfo[];
+  packages: PackageInfo[];
+} {
+  const toInfo = (file: ImportFileNode): PackageInfo => ({
+    name: file.path,
+    path: file.path,
+    dependencies: {},
+    devDependencies: {},
+  });
+
+  return {
+    apps: files.filter((file) => file.type === "app").map(toInfo),
+    packages: files.filter((file) => file.type === "package").map(toInfo),
+  };
+}
+
+/**
+ * Build a file-to-file import graph from an in-memory source map.
+ * Nodes are source files; edges mean "this file imports that file".
  */
 export function buildImportGraph(
   files: ReadonlyMap<string, string>,
   apps: PackageInfo[],
   packages: PackageInfo[],
-): DependencyEdge[] {
+): ImportGraph {
   const allPackages = [...apps, ...packages].sort(
     (a, b) => b.path.length - a.path.length,
   );
-  const counts = new Map<string, number>();
+  const fileSet = new Set(files.keys());
+  const edgeKeys = new Set<string>();
+  const edges: DependencyEdge[] = [];
+  const usedFiles = new Set<string>();
 
   for (const [filePath, content] of files) {
-    const owner = packageOwningPath(filePath, allPackages);
-    if (!owner) {
+    if (!packageOwningPath(filePath, allPackages)) {
       continue;
     }
 
     for (const specifier of extractImportSpecifiers(content)) {
-      const target = resolveSpecifierToPackage(
+      const target = resolveImportToFile(
         filePath,
         specifier,
         allPackages,
+        fileSet,
       );
-      if (!target || target.name === owner.name) {
+      if (!target || target === filePath) {
         continue;
       }
 
-      const key = `${owner.name}\0${target.name}`;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      const key = `${filePath}\0${target}`;
+      if (edgeKeys.has(key)) {
+        continue;
+      }
+      edgeKeys.add(key);
+      usedFiles.add(filePath);
+      usedFiles.add(target);
+      edges.push({
+        from: filePath,
+        to: target,
+        type: "import",
+      });
     }
   }
 
-  return [...counts.entries()].map(([key, count]) => {
-    const separator = key.indexOf("\0");
-    return {
-      from: key.slice(0, separator),
-      to: key.slice(separator + 1),
-      type: "import" as const,
-      count,
-    };
+  const fileNodes: ImportFileNode[] = [...usedFiles].sort().flatMap((filePath) => {
+    const owner = packageOwningPath(filePath, allPackages);
+    if (!owner) {
+      return [];
+    }
+    return [
+      {
+        path: filePath,
+        packageName: owner.name,
+        type: packageKind(owner, apps),
+      },
+    ];
   });
+
+  return { files: fileNodes, edges };
 }

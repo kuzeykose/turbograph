@@ -4,17 +4,16 @@ import {
   buildImportGraph,
   selectImportSourceFiles,
 } from "@workspace/graph";
-import type { DependencyEdge, TurborepoStructure } from "@workspace/graph";
+import type { ImportGraph, TurborepoStructure } from "@workspace/graph";
 import type { GitBlobRef } from "@/types/github";
 
-export interface ImportGraphResult {
-  edges: DependencyEdge[];
+export interface ImportGraphResult extends ImportGraph {
   scannedFiles: number;
   truncated: boolean;
 }
 
 /**
- * Scan workspace source files for import usage and aggregate to package edges.
+ * Scan workspace source files and build a file-to-file import graph.
  * Reuses the cached recursive git tree; fetches blob text only for source files.
  */
 export async function analyzeImportGraph(
@@ -50,9 +49,10 @@ export async function analyzeImportGraph(
   });
 
   const files = await githubService.getBlobTexts(owner, repo, blobs);
+  const graph = buildImportGraph(files, structure.apps, structure.packages);
 
   return {
-    edges: buildImportGraph(files, structure.apps, structure.packages),
+    ...graph,
     scannedFiles: files.size,
     truncated,
   };

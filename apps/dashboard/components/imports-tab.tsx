@@ -1,9 +1,13 @@
-import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { Archive, Waypoints } from "@workspace/ui/icons";
 import { TurborepoGraphVisual } from "./turborepo-graph-visual";
+import {
+  importFilesToLayoutNodes,
+  type DependencyEdge,
+  type ImportFileNode,
+} from "@workspace/graph";
 
 interface ImportsTabProps {
-  turborepoStructure: TurborepoStructure;
+  importFiles: ImportFileNode[];
   importGraph: DependencyEdge[];
   loading: boolean;
   truncated?: boolean;
@@ -15,7 +19,7 @@ interface ImportsTabProps {
 }
 
 export function ImportsTab({
-  turborepoStructure,
+  importFiles,
   importGraph,
   loading,
   truncated,
@@ -25,6 +29,8 @@ export function ImportsTab({
   repo,
   branch,
 }: ImportsTabProps) {
+  const { apps, packages } = importFilesToLayoutNodes(importFiles);
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       {loading ? (
@@ -40,19 +46,15 @@ export function ImportsTab({
         <div className="m-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
           {error}
         </div>
-      ) : turborepoStructure.apps.length === 0 &&
-        turborepoStructure.packages.length === 0 ? (
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800 dark:bg-zinc-800">
-          <Archive className="mx-auto h-12 w-12 text-zinc-400" />
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-            No apps or packages found in this Turborepo
-          </p>
-        </div>
       ) : importGraph.length === 0 ? (
         <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-8 text-center dark:border-zinc-800 dark:bg-zinc-800">
-          <Waypoints className="mx-auto h-12 w-12 text-zinc-400" />
+          {importFiles.length === 0 && !scannedFiles ? (
+            <Archive className="mx-auto h-12 w-12 text-zinc-400" />
+          ) : (
+            <Waypoints className="mx-auto h-12 w-12 text-zinc-400" />
+          )}
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-            No workspace import edges found
+            No file-to-file imports found
             {scannedFiles ? ` after scanning ${scannedFiles} files` : ""}
           </p>
         </div>
@@ -65,8 +67,8 @@ export function ImportsTab({
           ) : null}
           <div className="flex-1 min-h-0">
             <TurborepoGraphVisual
-              apps={turborepoStructure.apps}
-              packages={turborepoStructure.packages}
+              apps={apps}
+              packages={packages}
               dependencies={importGraph}
               github={{ owner, repo, branch }}
               edgeMode="imports"

@@ -114,13 +114,14 @@ export interface GraphGithubContext {
   branch?: string | null;
 }
 
-function githubTreeUrl(
+function githubContentUrl(
   ctx: GraphGithubContext,
   relativePath: string,
 ): string {
   const branch = ctx.branch?.trim() || "HEAD";
   const p = relativePath.replace(/^\/+/, "");
-  return `https://github.com/${ctx.owner}/${ctx.repo}/tree/${encodeURIComponent(branch)}/${p}`;
+  const kind = /\.[^./]+$/.test(p) ? "blob" : "tree";
+  return `https://github.com/${ctx.owner}/${ctx.repo}/${kind}/${encodeURIComponent(branch)}/${p}`;
 }
 
 interface TurborepoGraphVisualProps {
@@ -523,7 +524,7 @@ export function TurborepoGraphVisual({
 
   const githubHref =
     github && selectedPackageMeta
-      ? githubTreeUrl(github, selectedPackageMeta.path)
+      ? githubContentUrl(github, selectedPackageMeta.path)
       : null;
 
   return (
@@ -904,7 +905,7 @@ export function TurborepoGraphVisual({
                       {selectedEdgeLists.outgoing.length > 0 ? (
                         <div>
                           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                            Depends on
+                            {edgeMode === "imports" ? "Imports" : "Depends on"}
                           </p>
                           <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
                             {selectedEdgeLists.outgoing.map((e) => (
@@ -917,7 +918,7 @@ export function TurborepoGraphVisual({
                                 </span>
                                 <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
                                   {e.type === "import"
-                                    ? `${e.count ?? 1} import${(e.count ?? 1) === 1 ? "" : "s"}`
+                                    ? "imports"
                                     : e.type === "devDependency"
                                       ? "dev"
                                       : "prod"}
@@ -930,7 +931,9 @@ export function TurborepoGraphVisual({
                       {selectedEdgeLists.incoming.length > 0 ? (
                         <div>
                           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                            Depended on by
+                            {edgeMode === "imports"
+                              ? "Imported by"
+                              : "Depended on by"}
                           </p>
                           <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
                             {selectedEdgeLists.incoming.map((e) => (
@@ -943,7 +946,7 @@ export function TurborepoGraphVisual({
                                 </span>
                                 <span className="shrink-0 text-[10px] capitalize text-muted-foreground">
                                   {e.type === "import"
-                                    ? `${e.count ?? 1} import${(e.count ?? 1) === 1 ? "" : "s"}`
+                                    ? "imports"
                                     : e.type === "devDependency"
                                       ? "dev"
                                       : "prod"}
@@ -974,7 +977,13 @@ export function TurborepoGraphVisual({
                     title={type}
                   />
                   <span className="text-xs capitalize text-muted-foreground">
-                    {type === "app" ? "Application" : "Package"}
+                    {type === "app"
+                      ? edgeMode === "imports"
+                        ? "App file"
+                        : "Application"
+                      : edgeMode === "imports"
+                        ? "Package file"
+                        : "Package"}
                   </span>
                 </div>
               ))}
@@ -994,7 +1003,7 @@ export function TurborepoGraphVisual({
                     }}
                   />
                   <span className="text-xs text-muted-foreground">
-                    Import usage
+                    File import
                   </span>
                 </div>
               ) : (

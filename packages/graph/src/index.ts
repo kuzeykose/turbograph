@@ -6,6 +6,8 @@ export type {
   GraphNode,
   GraphEdge,
   TurborepoStructure,
+  ImportFileNode,
+  ImportGraph,
 } from "./types";
 
 // Colors
@@ -52,6 +54,8 @@ export {
   MAX_IMPORT_SOURCE_FILES,
   buildImportGraph,
   extractImportSpecifiers,
+  importFilesToLayoutNodes,
   isImportSourceFile,
+  resolveImportToFile,
   selectImportSourceFiles,
 } from "./imports";

@@ -10,6 +10,7 @@ import {
   DependencyEdge,
 } from "@/lib/utils/turborepo";
 import { analyzeImportGraph } from "@/lib/utils/imports";
+import type { ImportFileNode } from "@workspace/graph";
 
 export function useRepositoryQuery(owner: string, repo: string) {
   return useQuery({
@@ -49,6 +50,7 @@ export function useTurborepoAnalysisQuery(
 }
 
 interface ImportGraphAnalysis {
+  files: ImportFileNode[];
   edges: DependencyEdge[];
   scannedFiles: number;
   truncated: boolean;
@@ -65,7 +67,7 @@ export function useImportGraphQuery(
     queryKey: queryKeys.repository.imports(owner, repo, branch),
     queryFn: async () => {
       if (!structure) {
-        return { edges: [], scannedFiles: 0, truncated: false };
+        return { files: [], edges: [], scannedFiles: 0, truncated: false };
       }
       const ref =
         branch ||

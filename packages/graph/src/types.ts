@@ -56,3 +56,20 @@ export interface TurborepoStructure {
   /** Resolved config filename ("turbo.json" or "turbo.jsonc"); undefined when not a Turborepo. */
   turboConfigFile?: string;
 }
+
+/**
+ * A source file that participates in the import graph.
+ */
+export interface ImportFileNode {
+  path: string;
+  packageName: string;
+  type: "app" | "package";
+}
+
+/**
+ * File-to-file import graph: nodes are source files, edges are import links.
+ */
+export interface ImportGraph {
+  files: ImportFileNode[];
+  edges: DependencyEdge[];
+}

@@ -24,6 +24,7 @@ export default function RepositoryPage() {
     turborepoStructure,
     dependencyGraph,
     importGraph,
+    importFiles,
     importGraphLoading,
     importGraphTruncated,
     importGraphScannedFiles,
@@ -217,7 +218,7 @@ export default function RepositoryPage() {
 
           {activeTab === "imports" && turborepoStructure?.isTurborepo && (
             <ImportsTab
-              turborepoStructure={turborepoStructure}
+              importFiles={importFiles}
               importGraph={importGraph}
               loading={turborepoLoading || importGraphLoading}
               truncated={importGraphTruncated}
