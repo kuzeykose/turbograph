@@ -104,16 +104,26 @@ A Next.js web application for exploring GitHub repositories and visualizing Turb
 
 ### Setup
 
-1. **Create a Supabase project** and enable the GitHub OAuth provider. Add scopes `repo` or `public_repo` depending on your needs.
+Sign-in is **Supabase Auth with the GitHub OAuth provider**. Users are GitHub OAuth users in Supabase; there is no separate GitHub App install for login.
 
-2. **Configure environment variables** in `apps/dashboard/.env.local`:
+1. **Create a GitHub OAuth App** (not a GitHub App) at [GitHub Developer Settings](https://github.com/settings/developers) → **OAuth Apps** → **New OAuth App**.
+   - Homepage URL: `http://localhost:3000` (and your production origin later)
+   - **Authorization callback URL** must be the Supabase callback, not this app:
+     `https://<project-ref>.supabase.co/auth/v1/callback`
+
+2. **Enable GitHub in Supabase** (Authentication → Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Add scopes `repo` and `read:user`.
+
+3. **Allow the app callback** in Supabase (Authentication → URL Configuration → Redirect URLs):
+   `http://localhost:3000/auth/callback` (and `https://your-domain/auth/callback` in production)
+
+4. **Configure environment variables** in `apps/dashboard/.env.local`:
 
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    ```
 
-3. **Run the dashboard:**
+5. **Run the dashboard:**
 
    ```bash
    pnpm dev --filter turbograph-dashboard

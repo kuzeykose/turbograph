@@ -1,6 +1,11 @@
 export const DEFAULT_POST_LOGIN_PATH = "/dashboard";
 
-/** GitHub OAuth App scopes requested at sign-in (Authorized OAuth Apps). */
+/**
+ * Scopes requested on Supabase `signInWithOAuth({ provider: "github" })`.
+ * Supabase signs the user in; these scopes grant the GitHub provider_token
+ * access to `/user/repos`. Requires a GitHub OAuth App (not a GitHub App)
+ * in the Supabase GitHub provider settings.
+ */
 export const GITHUB_OAUTH_SCOPES = "repo read:user";
 
 /**

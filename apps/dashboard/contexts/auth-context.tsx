@@ -98,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
+        // Same Supabase GitHub OAuth sign-in, used to mint a fresh provider_token.
         redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectPath),
         scopes: GITHUB_OAUTH_SCOPES,
       },

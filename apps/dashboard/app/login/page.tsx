@@ -37,6 +37,7 @@ function LoginForm() {
 
       const supabase = createSupabaseBrowserClient();
 
+      // Identity is created by Supabase Auth. GitHub is only the OAuth provider.
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "github",
         options: {
@@ -71,7 +72,7 @@ function LoginForm() {
             Sign in with GitHub
           </h1>
           <p className="mt-1 text-base text-zinc-400 dark:text-zinc-500">
-            Sign in once to list your repositories and raise GitHub API limits.
+            Sign in with your GitHub account to continue.
           </p>
         </div>
 
@@ -102,8 +103,8 @@ function LoginForm() {
         </div>
 
         <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
-          GitHub will ask you to authorize TurboGraph as an OAuth app. You can
-          revoke access anytime from GitHub Settings → Applications.
+          GitHub will ask you to authorize repository access. You can revoke it
+          anytime from GitHub Settings → Applications.
         </p>
       </div>
     </main>
