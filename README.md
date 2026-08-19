@@ -111,7 +111,7 @@ Sign-in is **Supabase Auth with the GitHub OAuth provider**. Users are GitHub OA
    - **Authorization callback URL** must be the Supabase callback, not this app:
      `https://<project-ref>.supabase.co/auth/v1/callback`
 
-2. **Enable GitHub in Supabase** (Authentication → Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Add scopes `repo` and `read:user`.
+2. **Enable GitHub in Supabase** (Authentication → Sign In / Providers → GitHub). Paste the OAuth App **Client ID** and **Client Secret**. Add scopes `repo` and `read:user`.
 
 3. **Allow the app callback** in Supabase (Authentication → URL Configuration → Redirect URLs):
    `http://localhost:3000/auth/callback` (and `https://your-domain/auth/callback` in production)
