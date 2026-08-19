@@ -1,0 +1,83 @@
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+  js: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  jsx: "jsx",
+  ts: "typescript",
+  mts: "typescript",
+  cts: "typescript",
+  tsx: "tsx",
+  py: "python",
+  rb: "ruby",
+  java: "java",
+  go: "go",
+  rs: "rust",
+  cpp: "cpp",
+  cc: "cpp",
+  cxx: "cpp",
+  c: "c",
+  h: "c",
+  hpp: "cpp",
+  css: "css",
+  scss: "scss",
+  less: "less",
+  html: "html",
+  htm: "html",
+  xml: "xml",
+  svg: "xml",
+  vue: "html",
+  json: "json",
+  jsonc: "json",
+  md: "markdown",
+  mdx: "markdown",
+  yml: "yaml",
+  yaml: "yaml",
+  sh: "bash",
+  bash: "bash",
+  zsh: "bash",
+  sql: "sql",
+  graphql: "graphql",
+  gql: "graphql",
+  php: "php",
+  swift: "swift",
+  kt: "kotlin",
+  kts: "kotlin",
+  dart: "dart",
+  lua: "lua",
+  r: "r",
+  scala: "scala",
+  ex: "elixir",
+  exs: "elixir",
+  toml: "toml",
+  ini: "ini",
+  env: "ini",
+  diff: "diff",
+  patch: "diff",
+  dockerfile: "docker",
+  makefile: "makefile",
+  graphqls: "graphql",
+};
+
+const LANGUAGE_BY_FILENAME: Record<string, string> = {
+  dockerfile: "docker",
+  makefile: "makefile",
+  gemfile: "ruby",
+  rakefile: "ruby",
+  procfile: "yaml",
+  "turbo.json": "json",
+  "turbo.jsonc": "json",
+  "package.json": "json",
+  "tsconfig.json": "json",
+  ".gitignore": "bash",
+  ".npmrc": "ini",
+};
+
+export function getLanguageFromFilename(filename: string): string {
+  const lowerName = filename.toLowerCase();
+  if (LANGUAGE_BY_FILENAME[lowerName]) {
+    return LANGUAGE_BY_FILENAME[lowerName];
+  }
+
+  const ext = lowerName.split(".").pop();
+  return LANGUAGE_BY_EXTENSION[ext || ""] || "text";
+}

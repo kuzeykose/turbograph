@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRepositoryContext } from "@/contexts/repository-context";
-import { Clock, BarChart3, List, Menu, Sparkles } from "@workspace/ui/icons";
+import { Clock, BarChart3, List, Menu, Sparkles, Folder } from "@workspace/ui/icons";
 import { Button } from "@workspace/ui/components/button";
 import {
   Sheet,
@@ -142,12 +142,11 @@ export function RepositorySidebar() {
         },
       ]
       : []),
-    // Files tab hidden for now — restore with Folder import when bringing it back
-    // {
-    //   value: "files",
-    //   label: "Files",
-    //   icon: <Folder className="h-4 w-4" />,
-    // },
+    {
+      value: "files",
+      label: "Files",
+      icon: <Folder className="h-4 w-4" />,
+    },
   ];
 
   const handleTabChange = (tab: TabValue) => {
