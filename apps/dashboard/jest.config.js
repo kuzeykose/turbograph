@@ -9,6 +9,10 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   testEnvironment: 'jest-environment-jsdom',
+  // jsdom defaults to the "browser" export condition, which hands Jest the ESM
+  // build of packages like lucide-react and fails at `import`. Resolve the
+  // node/CJS condition instead, matching how Jest itself loads modules.
+  testEnvironmentOptions: { customExportConditions: ['node'] },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     // yaml/minimatch default to ESM; Jest needs their CJS builds.

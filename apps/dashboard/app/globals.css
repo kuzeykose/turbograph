@@ -200,3 +200,16 @@
   animation: shimmer-rotate 3s linear infinite;
   pointer-events: none;
 }
+
+/*
+ * A horizontal strip that scrolls without a scrollbar eating a row of its
+ * height — the graph header's tab bar is one line tall and cannot spare it.
+ */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
