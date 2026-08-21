@@ -18,6 +18,7 @@ export const nodeColors = {
 export const edgeColors = {
   dependency: "oklch(0.65 0.18 265)",
   devDependency: "oklch(0.72 0.16 85)",
+  import: "oklch(0.62 0.14 330)",
 } as const;
 
 /**
@@ -31,4 +32,5 @@ export const nodeColorsHex = {
 export const edgeColorsHex = {
   dependency: "#7c3aed",
   devDependency: "#eab308",
+  import: "#db2777",
 } as const;

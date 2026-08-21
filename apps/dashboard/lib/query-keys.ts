@@ -5,8 +5,10 @@ export const queryKeys = {
   repository: {
     detail: (owner: string, repo: string) =>
       ["repository", owner, repo] as const,
-    turborepo: (owner: string, repo: string) =>
-      ["repository", owner, repo, "turborepo"] as const,
+    turborepo: (owner: string, repo: string, branch?: string) =>
+      ["repository", owner, repo, "turborepo", branch] as const,
+    imports: (owner: string, repo: string, branch?: string) =>
+      ["repository", owner, repo, "imports", branch] as const,
   },
   contents: {
     dir: (owner: string, repo: string, path: string, branch?: string) =>

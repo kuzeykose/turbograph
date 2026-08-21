@@ -104,6 +104,27 @@ export interface GitHubInstallationRepositoriesResponse {
 }
 
 // Request option types
+export interface GitHubTreeItem {
+  path: string;
+  mode: string;
+  type: "blob" | "tree" | "commit";
+  sha: string;
+  size?: number;
+  url: string;
+}
+
+export interface GitHubTreeResponse {
+  sha: string;
+  url: string;
+  tree: GitHubTreeItem[];
+  truncated: boolean;
+}
+
+export interface GitBlobRef {
+  path: string;
+  sha: string;
+}
+
 export interface GetContentsOptions {
   ref?: string; // Branch name or commit SHA
 }

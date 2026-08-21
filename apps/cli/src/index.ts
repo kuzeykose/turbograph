@@ -6,10 +6,16 @@ import * as path from "node:path";
 import chalk from "chalk";
 import {
   buildDependencyGraph,
+  buildImportGraph,
   calculateGraphLayout,
   generateSvgDocument,
+  importFilesToLayoutNodes,
 } from "@workspace/graph";
-import { analyzeTurborepo, resolveTurboConfigFile } from "./analyzer.js";
+import {
+  analyzeTurborepo,
+  collectImportSourceFiles,
+  resolveTurboConfigFile,
+} from "./analyzer.js";
 
 const program = new Command();
 
@@ -24,6 +30,7 @@ program
   .option("-h, --height <number>", "SVG height in pixels", "550")
   .option("--no-grid", "Disable grid background")
   .option("-d, --dir <path>", "Root directory of the turborepo", process.cwd())
+  .option("--imports", "Graph file-to-file import usage instead of package.json")
   .action(async (options) => {
     const rootDir = path.resolve(options.dir);
 
@@ -54,20 +61,43 @@ program
     );
 
     // Build dependency graph
-    const dependencies = buildDependencyGraph(
-      structure.apps,
-      structure.packages,
-      structure.workspacePackages
-    );
+    const importGraph = options.imports
+      ? buildImportGraph(
+          await collectImportSourceFiles(rootDir, [
+            ...structure.apps.map((pkg) => pkg.path),
+            ...structure.packages.map((pkg) => pkg.path),
+          ]),
+          structure.apps,
+          structure.packages
+        )
+      : null;
 
-    console.log(chalk.green(`✓ Found ${dependencies.length} dependencies`));
+    const layoutPackages = importGraph
+      ? importFilesToLayoutNodes(importGraph.files)
+      : { apps: structure.apps, packages: structure.packages };
+
+    const dependencies = importGraph
+      ? importGraph.edges
+      : buildDependencyGraph(
+          structure.apps,
+          structure.packages,
+          structure.workspacePackages
+        );
+
+    console.log(
+      chalk.green(
+        options.imports
+          ? `✓ Found ${importGraph?.files.length ?? 0} files and ${dependencies.length} import edges`
+          : `✓ Found ${dependencies.length} dependencies`
+      )
+    );
 
     // Calculate layout
     const width = parseInt(options.width, 10);
     const height = parseInt(options.height, 10);
     const { nodes, edges } = calculateGraphLayout(
-      structure.apps,
-      structure.packages,
+      layoutPackages.apps,
+      layoutPackages.packages,
       dependencies,
       { width, height }
     );

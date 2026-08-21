@@ -17,6 +17,15 @@ export const DEFAULT_MIN_VERTICAL_GAP = 52;
 export const DEFAULT_MIN_LEVEL_WIDTH = 210;
 
 /**
+ * Minimum vertical spacing between depth layers (center-to-center).
+ *
+ * Wider than `DEFAULT_MIN_VERTICAL_GAP` because layers running top to bottom
+ * have edges and arrow heads crossing the space between them, where nodes
+ * stacked inside one layer sit flush.
+ */
+export const DEFAULT_MIN_LEVEL_HEIGHT = 110;
+
+/**
  * Config filenames Turborepo accepts, in resolution order.
  * Turbo reads `turbo.json` first and falls back to `turbo.jsonc`.
  */

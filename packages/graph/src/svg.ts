@@ -50,6 +50,37 @@ const DEFAULT_RECT_OPTS: EdgePathOptions = {
 };
 
 /**
+ * Endpoints of a straight edge between two rectangular node cards, clipped to
+ * each card's boundary. Shared by the SVG path builder and the canvas renderer
+ * so both draw edges with identical geometry.
+ */
+export function computeEdgeEndpoints(
+  source: Pick<GraphNode, "x" | "y">,
+  target: Pick<GraphNode, "x" | "y">,
+  opts: { halfWidth: number; halfHeight: number }
+): { sx: number; sy: number; tx: number; ty: number } | null {
+  const dx = target.x - source.x;
+  const dy = target.y - source.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1e-10) return null;
+
+  const ux = dx / dist;
+  const uy = dy / dist;
+
+  const ts = rayExitAABB(opts.halfWidth, opts.halfHeight, ux, uy);
+  const tt = rayExitAABB(opts.halfWidth, opts.halfHeight, -ux, -uy);
+  if (!Number.isFinite(ts) || !Number.isFinite(tt)) return null;
+
+  const tEnd = Math.max(0, tt - BOUNDARY_EPS);
+  return {
+    sx: source.x + ux * ts,
+    sy: source.y + uy * ts,
+    tx: target.x - ux * tEnd,
+    ty: target.y - uy * tEnd,
+  };
+}
+
+/**
  * Generate a curved edge path between two nodes.
  * Uses rectangular card bounds by default (see GRAPH_NODE_CARD); pass `nodeRadius` for circle routing.
  */
@@ -78,21 +109,10 @@ export function generateEdgePath(
   let ty: number;
 
   if ("halfWidth" in opts) {
-    const hw = opts.halfWidth;
-    const hh = opts.halfHeight;
-    const ts = rayExitAABB(hw, hh, ux, uy);
-    const tt = rayExitAABB(hw, hh, -ux, -uy);
-    if (!Number.isFinite(ts) || !Number.isFinite(tt)) {
-      return "";
-    }
-    // Exit source and enter target along the center line; endpoints on the box edges.
-    sx = source.x + ux * ts;
-    sy = source.y + uy * ts;
-    const tEnd = Math.max(0, tt - BOUNDARY_EPS);
-    tx = target.x - ux * tEnd;
-    ty = target.y - uy * tEnd;
+    const ends = computeEdgeEndpoints(source, target, opts);
+    if (!ends) return "";
     // Straight segment — quadratic bulges were crossing into node interiors before the end.
-    return `M ${sx} ${sy} L ${tx} ${ty}`;
+    return `M ${ends.sx} ${ends.sy} L ${ends.tx} ${ends.ty}`;
   }
 
   const r = opts.nodeRadius ?? DEFAULT_NODE_RADIUS;
@@ -147,7 +167,9 @@ export function generateSvgDocument(
       const path = generateEdgePath(source, target, edgeOpts);
       const color = edgeColorsHex[edge.type];
       const dashArray =
-        edge.type === "devDependency" ? 'stroke-dasharray="6 4"' : "";
+        edge.type === "devDependency" || edge.type === "import"
+          ? 'stroke-dasharray="6 4"'
+          : "";
 
       return `    <path d="${path}" fill="none" stroke="${color}" stroke-width="1.5" ${dashArray} marker-end="url(#arrow-${edge.type})"/>`;
     })
@@ -209,6 +231,9 @@ export function generateSvgDocument(
     </marker>
     <marker id="arrow-devDependency" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="${edgeColorsHex.devDependency}"/>
+    </marker>
+    <marker id="arrow-import" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="${edgeColorsHex.import}"/>
     </marker>
   </defs>
   

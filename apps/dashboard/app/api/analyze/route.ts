@@ -5,10 +5,25 @@ import {
   SYSTEM_PROMPT,
   FIX_SYSTEM_PROMPT,
 } from "@/lib/prompts/monorepo-analysis";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const client = new Anthropic();
 
 export async function POST(req: Request) {
+  // Analysis spends model credits per call, so it is gated here rather than
+  // only in the UI: hiding the tab does nothing about a direct POST.
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return new Response(
+      JSON.stringify({ error: "Sign in to run an analysis" }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   const body = await req.json();
   const {
     apps,

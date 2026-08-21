@@ -8,13 +8,17 @@ export interface PackageInfo {
   devDependencies: Record<string, string>;
 }
 
+export type DependencyEdgeType = "dependency" | "devDependency" | "import";
+
 /**
  * Represents a dependency relationship between two packages
  */
 export interface DependencyEdge {
   from: string;
   to: string;
-  type: "dependency" | "devDependency";
+  type: DependencyEdgeType;
+  /** How many source files contribute to this edge (import graphs). */
+  count?: number;
 }
 
 /**
@@ -37,7 +41,8 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  type: "dependency" | "devDependency";
+  type: DependencyEdgeType;
+  count?: number;
 }
 
 /**
@@ -50,4 +55,21 @@ export interface TurborepoStructure {
   workspacePackages: Set<string>;
   /** Resolved config filename ("turbo.json" or "turbo.jsonc"); undefined when not a Turborepo. */
   turboConfigFile?: string;
+}
+
+/**
+ * A source file that participates in the import graph.
+ */
+export interface ImportFileNode {
+  path: string;
+  packageName: string;
+  type: "app" | "package";
+}
+
+/**
+ * File-to-file import graph: nodes are source files, edges are import links.
+ */
+export interface ImportGraph {
+  files: ImportFileNode[];
+  edges: DependencyEdge[];
 }

@@ -12,10 +12,13 @@ import {
   GetBranchesOptions,
   GetCommitsOptions,
   GetUserRepositoriesOptions,
+  GitHubTreeItem,
+  GitHubTreeResponse,
+  GitBlobRef,
   GraphQLResponse,
   PaginatedResponse,
 } from "@/types/github";
-import { PackageInfo } from "@/lib/utils/turborepo";
+import type { PackageInfo } from "@workspace/graph";
 
 interface CacheEntry {
   data: any;
@@ -32,6 +35,7 @@ class GitHubService {
     REPOSITORY: 5 * 60 * 1000, // 5 minutes
     BRANCHES: 2 * 60 * 1000, // 2 minutes
     CONTENTS: 2 * 60 * 1000, // 2 minutes
+    TREE: 2 * 60 * 1000, // 2 minutes
     COMMITS: 1 * 60 * 1000, // 1 minute
   };
 
@@ -540,6 +544,185 @@ class GitHubService {
       );
       return await response.json();
     });
+  }
+
+  /**
+   * Fetch a git tree (optionally recursive). `treeSha` may be a commit SHA,
+   * branch name, or tag.
+   */
+  private async fetchTree(
+    owner: string,
+    repo: string,
+    treeSha: string,
+    recursive: boolean,
+  ): Promise<GitHubTreeResponse> {
+    const params = recursive ? "?recursive=1" : "";
+    const response = await this.request(
+      `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(treeSha)}${params}`,
+    );
+    return await response.json();
+  }
+
+  /**
+   * Flatten a truncated recursive tree by walking directory SHAs.
+   */
+  private async flattenTruncatedTree(
+    owner: string,
+    repo: string,
+    treeSha: string,
+    prefix = "",
+    depth = 0,
+  ): Promise<GitHubTreeItem[]> {
+    const MAX_DEPTH = 5;
+    const listing = await this.fetchTree(owner, repo, treeSha, false);
+    const prefixPath = (itemPath: string) =>
+      prefix ? `${prefix}/${itemPath}` : itemPath;
+    const items: GitHubTreeItem[] = [];
+
+    for (const item of listing.tree) {
+      const itemPath = prefixPath(item.path);
+      if (item.type !== "tree") {
+        items.push({ ...item, path: itemPath });
+        continue;
+      }
+
+      if (depth >= MAX_DEPTH) {
+        items.push({ ...item, path: itemPath });
+        continue;
+      }
+
+      const subtree = await this.fetchTree(owner, repo, item.sha, true);
+      if (!subtree.truncated) {
+        items.push(
+          ...subtree.tree.map((child) => ({
+            ...child,
+            path: `${itemPath}/${child.path}`,
+          })),
+        );
+        continue;
+      }
+
+      items.push(
+        ...(await this.flattenTruncatedTree(
+          owner,
+          repo,
+          item.sha,
+          itemPath,
+          depth + 1,
+        )),
+      );
+    }
+
+    return items;
+  }
+
+  /**
+   * Recursively list every path in the repository at `ref` (branch, tag, SHA,
+   * or HEAD). Returns blobs/trees/commits — metadata only, not file contents.
+   */
+  async getRecursiveTree(
+    owner: string,
+    repo: string,
+    ref: string = "HEAD",
+  ): Promise<GitHubTreeItem[]> {
+    const cacheKey = `tree:${owner}/${repo}:${ref}`;
+    return this.getCached(cacheKey, this.CACHE_TTL.TREE, async () => {
+      const tree = await this.fetchTree(owner, repo, ref, true);
+      if (!tree.truncated) {
+        return tree.tree;
+      }
+      return this.flattenTruncatedTree(owner, repo, ref);
+    });
+  }
+
+  /**
+   * Fetch blob text for many files by git SHA, batched over GraphQL.
+   */
+  async getBlobTexts(
+    owner: string,
+    repo: string,
+    blobs: GitBlobRef[],
+  ): Promise<Map<string, string>> {
+    const results = new Map<string, string>();
+    if (blobs.length === 0) {
+      return results;
+    }
+
+    const BATCH_SIZE = 50;
+
+    for (let i = 0; i < blobs.length; i += BATCH_SIZE) {
+      const batch = blobs.slice(i, i + BATCH_SIZE);
+      const fieldSelections = batch
+        .map(
+          (_, index) => `
+        f${index}: object(oid: $oid${index}) {
+          ... on Blob { text }
+        }`,
+        )
+        .join("\n");
+
+      const variableDefs = batch
+        .map((_, index) => `$oid${index}: GitObjectID!`)
+        .join(", ");
+
+      const query = `
+        query($owner: String!, $name: String!, ${variableDefs}) {
+          repository(owner: $owner, name: $name) {
+            ${fieldSelections}
+          }
+        }
+      `;
+
+      const variables: Record<string, string> = {
+        owner,
+        name: repo,
+      };
+      batch.forEach((blob, index) => {
+        variables[`oid${index}`] = blob.sha;
+      });
+
+      try {
+        const response = await this.executeGraphQL<{
+          repository: Record<string, { text?: string | null } | null>;
+        }>(query, variables);
+
+        if (response.errors?.length || !response.data?.repository) {
+          throw new GitHubAPIError(
+            response.errors?.[0]?.message || "GraphQL blob query returned no data",
+          );
+        }
+
+        const repoData = response.data.repository;
+        batch.forEach((blob, index) => {
+          const text = repoData[`f${index}`]?.text;
+          if (typeof text === "string") {
+            results.set(blob.path, text);
+          }
+        });
+      } catch (error) {
+        console.warn("GraphQL blob batch failed, falling back to REST:", error);
+        await Promise.all(
+          batch.map(async (blob) => {
+            try {
+              const response = await this.request(
+                `/repos/${owner}/${repo}/git/blobs/${blob.sha}`,
+              );
+              const data = (await response.json()) as {
+                content?: string;
+                encoding?: string;
+              };
+              if (data.encoding === "base64" && data.content) {
+                results.set(blob.path, this.decodeBase64Content(data.content));
+              }
+            } catch (blobError) {
+              console.error(`Error fetching blob ${blob.path}:`, blobError);
+            }
+          }),
+        );
+      }
+    }
+
+    return results;
   }
 
   /**
