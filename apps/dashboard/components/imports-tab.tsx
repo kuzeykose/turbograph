@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Archive, Waypoints } from "@workspace/ui/icons";
 import { TurborepoGraphVisual } from "./turborepo-graph-visual";
 import {
@@ -29,7 +30,12 @@ export function ImportsTab({
   repo,
   branch,
 }: ImportsTabProps) {
-  const { apps, packages } = importFilesToLayoutNodes(importFiles);
+  // Derived once per import scan. Rebuilding these arrays on every render gave
+  // the graph new prop identities each frame and forced a full re-layout.
+  const { apps, packages } = useMemo(
+    () => importFilesToLayoutNodes(importFiles),
+    [importFiles],
+  );
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">

@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useRepositoryContext } from "@/contexts/repository-context";
-import { Clock, BarChart3, List, Menu, Sparkles, Waypoints, Folder } from "@workspace/ui/icons";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  signInReasonFor,
+  tabRequiresSignIn,
+  type RepositoryTab,
+} from "@/lib/repository-tabs";
+import { Clock, BarChart3, List, Menu, Sparkles, Waypoints, Folder, Lock } from "@workspace/ui/icons";
 import { Button } from "@workspace/ui/components/button";
 import {
   Sheet,
@@ -13,18 +19,15 @@ import {
 } from "@workspace/ui/components/sheet";
 import { cn } from "@workspace/ui/lib/utils";
 
-type TabValue =
-  | "files"
-  | "commits"
-  | "turborepo"
-  | "imports"
-  | "packages"
-  | "analysis";
+type TabValue = RepositoryTab;
 
 interface NavItem {
   value: TabValue;
   label: string;
   icon: React.ReactNode;
+  /** Offered but not usable until the reader signs in. */
+  locked?: boolean;
+  lockReason?: string;
 }
 
 function SidebarNavExpanded({
@@ -42,15 +45,22 @@ function SidebarNavExpanded({
         <button
           key={item.value}
           onClick={() => onTabChange(item.value)}
+          disabled={item.locked}
+          title={item.locked ? item.lockReason : undefined}
           className={cn(
             "h-8 flex items-center gap-3 rounded-sm p-2 text-sm transition-colors whitespace-nowrap",
-            activeTab === item.value
-              ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-              : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-50",
+            item.locked
+              ? "cursor-not-allowed text-zinc-400 dark:text-zinc-600"
+              : activeTab === item.value
+                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-50",
           )}
         >
           <span className="flex-shrink-0">{item.icon}</span>
           {item.label}
+          {item.locked ? (
+            <Lock className="ml-auto h-3 w-3 flex-shrink-0" />
+          ) : null}
         </button>
       ))}
     </nav>
@@ -72,14 +82,22 @@ function SidebarNavCollapsed({
         <button
           key={item.value}
           onClick={() => onTabChange(item.value)}
+          disabled={item.locked}
+          title={item.locked ? item.lockReason : item.label}
+          aria-label={item.label}
           className={cn(
-            "h-8 rounded-sm p-2 transition-colors",
-            activeTab === item.value
-              ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-              : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-50",
+            "relative h-8 rounded-sm p-2 transition-colors",
+            item.locked
+              ? "cursor-not-allowed text-zinc-400 dark:text-zinc-600"
+              : activeTab === item.value
+                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-50",
           )}
         >
           <span className="flex-shrink-0">{item.icon}</span>
+          {item.locked ? (
+            <Lock className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5" />
+          ) : null}
         </button>
       ))}
     </nav>
@@ -118,7 +136,18 @@ function SidebarSkeletonExpanded() {
 export function RepositorySidebar() {
   const { turborepoStructure, turborepoLoading, activeTab, setActiveTab } =
     useRepositoryContext();
+  const { user, loading: authLoading } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  /**
+   * Locked rather than hidden, so a guest can see what signing in buys them.
+   * Held back while auth is still resolving, or every tab flashes locked on the
+   * first paint of a signed-in session.
+   */
+  const lockFor = (tab: TabValue) =>
+    !authLoading && !user && tabRequiresSignIn(tab)
+      ? { locked: true, lockReason: signInReasonFor(tab) }
+      : {};
 
   const isInitialLoading = turborepoLoading && turborepoStructure === null;
   const isTurborepo = turborepoStructure?.isTurborepo ?? false;
@@ -133,6 +162,7 @@ export function RepositorySidebar() {
         },
         {
           value: "imports" as const,
+          ...lockFor("imports"),
           label: "Imports",
           icon: <Waypoints className="h-4 w-4" />,
         },
@@ -148,6 +178,7 @@ export function RepositorySidebar() {
         },
         {
           value: "analysis" as const,
+          ...lockFor("analysis"),
           label: "AI Analysis",
           icon: <Sparkles className="h-4 w-4" />,
         },
@@ -157,6 +188,7 @@ export function RepositorySidebar() {
       value: "files",
       label: "Files",
       icon: <Folder className="h-4 w-4" />,
+      ...lockFor("files"),
     },
   ];
 

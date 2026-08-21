@@ -1,10 +1,11 @@
 "use client";
 
 import { useAuth } from "@/contexts/auth-context";
+import { signInReasonFor, tabRequiresSignIn } from "@/lib/repository-tabs";
 import { useRepositoryContext } from "@/contexts/repository-context";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Info } from "@workspace/ui/icons";
+import { Info, Lock } from "@workspace/ui/icons";
 import { buildLoginUrl, pathWithSearch } from "@/lib/auth/redirect";
 import { RepositorySidebar } from "@/components/repository-sidebar";
 import { FilesTab } from "@/components/files-tab";
@@ -40,6 +41,13 @@ export default function RepositoryPage() {
     error: repoError,
     activeTab,
   } = useRepositoryContext();
+
+  /**
+   * Guests can reach a gated tab by URL, so the page checks as well as the
+   * sidebar. Held back while auth resolves, or a signed-in reader sees the
+   * prompt flash before their session loads.
+   */
+  const tabLocked = !authLoading && !user && tabRequiresSignIn(activeTab);
 
   // Local hooks for tab-specific state
   const {
@@ -184,8 +192,30 @@ export default function RepositoryPage() {
             </div>
           )}
 
+          {/* A guest reaching a gated tab by URL gets the reason, not the tab. */}
+          {tabLocked ? (
+            <div className="flex flex-1 items-center justify-center p-6">
+              <div className="max-w-sm rounded-lg border border-border bg-card p-6 text-center">
+                <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
+                <p className="mt-4 text-sm font-medium text-foreground">
+                  {signInReasonFor(activeTab)}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Signing in with GitHub raises your rate limit from 60 requests
+                  an hour to 5,000, and unlocks Imports, Files and AI Analysis.
+                </p>
+                <Link
+                  href={loginHref}
+                  className="mt-5 inline-flex items-center justify-center rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                >
+                  Sign in with GitHub
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
           {/* Tab content */}
-          {activeTab === "files" && (
+          {!tabLocked && activeTab === "files" && (
             <FilesTab
               owner={owner}
               repo={repo}
@@ -197,7 +227,7 @@ export default function RepositoryPage() {
             />
           )}
 
-          {activeTab === "commits" && turborepoStructure?.isTurborepo && (
+          {!tabLocked && activeTab === "commits" && turborepoStructure?.isTurborepo && (
             <CommitsTab
               commits={commits}
               commitsLoading={commitsLoading}
@@ -217,7 +247,7 @@ export default function RepositoryPage() {
             />
           )}
 
-          {activeTab === "turborepo" && turborepoStructure?.isTurborepo && (
+          {!tabLocked && activeTab === "turborepo" && turborepoStructure?.isTurborepo && (
             <DependenciesTab
               turborepoStructure={turborepoStructure}
               turborepoLoading={turborepoLoading}
@@ -228,7 +258,7 @@ export default function RepositoryPage() {
             />
           )}
 
-          {activeTab === "imports" && turborepoStructure?.isTurborepo && (
+          {!tabLocked && activeTab === "imports" && turborepoStructure?.isTurborepo && (
             <ImportsTab
               importFiles={importFiles}
               importGraph={importGraph}
@@ -242,7 +272,7 @@ export default function RepositoryPage() {
             />
           )}
 
-          {activeTab === "packages" && turborepoStructure?.isTurborepo && (
+          {!tabLocked && activeTab === "packages" && turborepoStructure?.isTurborepo && (
             <PackagesTab
               turborepoStructure={turborepoStructure}
               turborepoLoading={turborepoLoading}
@@ -250,7 +280,7 @@ export default function RepositoryPage() {
             />
           )}
 
-          {activeTab === "analysis" && turborepoStructure?.isTurborepo && (
+          {!tabLocked && activeTab === "analysis" && turborepoStructure?.isTurborepo && (
             <AnalysisTab
               turborepoStructure={turborepoStructure}
               dependencyGraph={dependencyGraph}

@@ -16,14 +16,17 @@ import {
 import { TurborepoStructure, DependencyEdge } from "@/lib/utils/turborepo";
 import { Repository } from "@/types/repository";
 import type { ImportFileNode } from "@workspace/graph";
+import { useAuth } from "@/contexts/auth-context";
+import {
+  REPOSITORY_TABS,
+  tabRequiresSignIn,
+  type RepositoryTab,
+} from "@/lib/repository-tabs";
 
-type TabValue =
-  | "files"
-  | "commits"
-  | "turborepo"
-  | "imports"
-  | "packages"
-  | "analysis";
+const EMPTY_EDGES: DependencyEdge[] = [];
+const EMPTY_FILES: ImportFileNode[] = [];
+
+type TabValue = RepositoryTab;
 
 interface RepositoryContextType {
   // Route params
@@ -50,14 +53,7 @@ interface RepositoryContextType {
   setActiveTab: (tab: TabValue) => void;
 }
 
-const REPO_TABS: TabValue[] = [
-  "files",
-  "commits",
-  "turborepo",
-  "imports",
-  "packages",
-  "analysis",
-];
+const REPO_TABS: TabValue[] = REPOSITORY_TABS;
 
 const RepositoryContext = createContext<RepositoryContextType | undefined>(
   undefined,
@@ -85,6 +81,8 @@ export function RepositoryProvider({
       : "turborepo"
   );
 
+  const { user } = useAuth();
+
   // Repository data via TanStack Query
   const {
     data: repository = null,
@@ -98,7 +96,9 @@ export function RepositoryProvider({
   } = useTurborepoAnalysisQuery(owner, repo, branch);
 
   const turborepoStructure = turborepoData?.structure ?? null;
-  const dependencyGraph = turborepoData?.dependencyGraph ?? [];
+  // Shared empty fallbacks: a fresh [] each render would defeat the graph's
+  // identity-based layout memoization while data is still loading.
+  const dependencyGraph = turborepoData?.dependencyGraph ?? EMPTY_EDGES;
 
   const {
     data: importGraphData,
@@ -109,11 +109,13 @@ export function RepositoryProvider({
     repo,
     turborepoStructure,
     branch,
-    activeTabState === "imports",
+    // Guests are shown a sign-in prompt on this tab, so the scan — which reads
+    // every source file in the repo — must not start behind it.
+    activeTabState === "imports" && user !== null,
   );
 
-  const importGraph = importGraphData?.edges ?? [];
-  const importFiles = importGraphData?.files ?? [];
+  const importGraph = importGraphData?.edges ?? EMPTY_EDGES;
+  const importFiles = importGraphData?.files ?? EMPTY_FILES;
   const importGraphTruncated = importGraphData?.truncated ?? false;
   const importGraphScannedFiles = importGraphData?.scannedFiles ?? 0;
   const importGraphError = importGraphQueryError
