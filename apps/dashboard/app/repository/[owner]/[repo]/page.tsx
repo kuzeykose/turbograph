@@ -1,13 +1,14 @@
 "use client";
 
 import { useAuth } from "@/contexts/auth-context";
-import { signInReasonFor, tabRequiresSignIn } from "@/lib/repository-tabs";
+import { tabRequiresSignIn } from "@/lib/repository-tabs";
 import { useRepositoryContext } from "@/contexts/repository-context";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Info, Lock } from "@workspace/ui/icons";
 import { buildLoginUrl, pathWithSearch } from "@/lib/auth/redirect";
 import { RepositorySidebar } from "@/components/repository-sidebar";
+import { SignInGate } from "@/components/sign-in-gate";
+import { GuestNotice } from "@/components/guest-notice";
 import { FilesTab } from "@/components/files-tab";
 import { CommitsTab } from "@/components/commits-tab";
 import { DependenciesTab } from "@/components/dependencies-tab";
@@ -43,9 +44,10 @@ export default function RepositoryPage() {
   } = useRepositoryContext();
 
   /**
-   * Guests can reach a gated tab by URL, so the page checks as well as the
-   * sidebar. Held back while auth resolves, or a signed-in reader sees the
-   * prompt flash before their session loads.
+   * The sidebar marks gated tabs but still opens them, so this prompt — not the
+   * tab — is what a guest lands on, whether they clicked or came in by URL.
+   * Held back while auth resolves, or a signed-in reader sees the prompt flash
+   * before their session loads.
    */
   const tabLocked = !authLoading && !user && tabRequiresSignIn(activeTab);
 
@@ -60,7 +62,9 @@ export default function RepositoryPage() {
     owner,
     repo,
     branch,
-    enabled: activeTab === "files",
+    // The prompt stands in for the tab, so don't spend the guest's rate limit
+    // fetching contents behind it.
+    enabled: activeTab === "files" && !tabLocked,
   });
 
   const {
@@ -135,33 +139,13 @@ export default function RepositoryPage() {
     <>
       <RepositorySidebar />
 
+      {/* Sits over the page in the corner, so a guest reads it without the
+          repository being pushed down for it. */}
+      {!user && <GuestNotice loginHref={loginHref} />}
+
       {/* Main content */}
       <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <div className="w-full max-w-full flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* Info banner for unauthenticated users */}
-          {!user && (
-            <div className="m-4 mb-2 rounded-lg border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-700 dark:bg-yellow-950 dark:text-yellow-200">
-              <div className="flex items-start gap-3">
-                <Info className="h-5 w-5 flex-shrink-0" />
-                <div>
-                  <p className="font-medium">Viewing as guest</p>
-                  <p className="mt-1">
-                    You are viewing this repository without authentication.
-                    GitHub API has rate limits for unauthenticated requests (60
-                    requests per hour).{" "}
-                    <Link
-                      href={loginHref}
-                      className="font-medium underline hover:no-underline"
-                    >
-                      Sign in
-                    </Link>{" "}
-                    to increase your rate limit to 5,000 requests per hour.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {error && (
             <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
               {error}
@@ -169,7 +153,7 @@ export default function RepositoryPage() {
           )}
 
           {/* Turborepo loading skeleton */}
-          {turborepoLoading && !turborepoStructure && activeTab !== "files" && (
+          {turborepoLoading && !turborepoStructure && activeTab !== "files" && !tabLocked && (
             <div className="flex-1 p-6 space-y-6">
               {/* Graph area skeleton */}
               <div className="space-y-3">
@@ -192,27 +176,8 @@ export default function RepositoryPage() {
             </div>
           )}
 
-          {/* A guest reaching a gated tab by URL gets the reason, not the tab. */}
-          {tabLocked ? (
-            <div className="flex flex-1 items-center justify-center p-6">
-              <div className="max-w-sm rounded-lg border border-border bg-card p-6 text-center">
-                <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-4 text-sm font-medium text-foreground">
-                  {signInReasonFor(activeTab)}
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Signing in with GitHub raises your rate limit from 60 requests
-                  an hour to 5,000, and unlocks Imports, Files and AI Analysis.
-                </p>
-                <Link
-                  href={loginHref}
-                  className="mt-5 inline-flex items-center justify-center rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
-                >
-                  Sign in with GitHub
-                </Link>
-              </div>
-            </div>
-          ) : null}
+          {/* A guest opening a gated tab gets the pitch, not the tab. */}
+          {tabLocked ? <SignInGate tab={activeTab} loginHref={loginHref} /> : null}
 
           {/* Tab content */}
           {!tabLocked && activeTab === "files" && (

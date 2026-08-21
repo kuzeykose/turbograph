@@ -40,16 +40,65 @@ export function tabRequiresSignIn(tab: RepositoryTab): boolean {
   return SIGN_IN_REQUIRED.has(tab);
 }
 
-/** Short reason shown where a tab is offered but not available. */
-export function signInReasonFor(tab: RepositoryTab): string {
+/**
+ * What a reader gets by signing in, per tab. Written as the thing they gain,
+ * not the door they hit: the gate is the best place this app ever has to
+ * explain itself, and "sign in to continue" explains nothing.
+ */
+export interface SignInPitch {
+  /** The tab's own name, for the eyebrow above the headline. */
+  eyebrow: string;
+  title: string;
+  body: string;
+  /** Three concrete gains, shortest first. */
+  perks: [string, string, string];
+}
+
+export function signInPitchFor(tab: RepositoryTab): SignInPitch {
   switch (tab) {
     case "imports":
-      return "Scanning imports needs a signed-in GitHub rate limit";
+      return {
+        eyebrow: "Imports",
+        title: "Trace every import in this repo",
+        body: "The import graph reads all source files and draws the edges between them — which module pulls which, and what moves when one of them does.",
+        perks: [
+          "5,000 GitHub requests an hour, not 60",
+          "A full-repo scan instead of a sample",
+          "File-level edges across every package",
+        ],
+      };
     case "files":
-      return "Reading file contents needs a signed-in GitHub rate limit";
+      return {
+        eyebrow: "Files",
+        title: "Read any file in this repo",
+        body: "File contents arrive one blob at a time from the GitHub API. A guest's hourly budget is spent a few files into the tree.",
+        perks: [
+          "5,000 GitHub requests an hour, not 60",
+          "Open any file, on any branch",
+          "Syntax-highlighted, right beside the tree",
+        ],
+      };
     case "analysis":
-      return "Sign in to run an AI analysis";
+      return {
+        eyebrow: "AI Analysis",
+        title: "Get an AI read on this monorepo",
+        body: "The analysis walks the dependency graph, the workspace layout and the Turborepo config, then writes up what looks fragile and what to do about it.",
+        perks: [
+          "Dependency health and cycle warnings",
+          "A review of your Turborepo pipeline",
+          "A fix plan you can edit and re-run",
+        ],
+      };
     default:
-      return "Sign in to use this";
+      return {
+        eyebrow: "Signed in",
+        title: "Sign in to open this tab",
+        body: "Signing in with GitHub raises your rate limit from 60 requests an hour to 5,000 and opens the tabs that need one.",
+        perks: [
+          "5,000 GitHub requests an hour, not 60",
+          "Imports, Files and AI Analysis",
+          "Private repositories you choose to connect",
+        ],
+      };
   }
 }
