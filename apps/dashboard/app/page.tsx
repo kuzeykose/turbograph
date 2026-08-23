@@ -17,6 +17,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Header } from "@/components/header";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TurborepoGraphVisual } from "@/components/turborepo-graph-visual";
+import { AI_ANALYSIS_ENABLED } from "@/lib/feature-flags";
 
 import {
   type PackageInfo,
@@ -145,13 +146,21 @@ const steps = [
     description:
       "Browse commits and trace which packages are affected downstream.",
   },
-  {
-    number: "04",
-    title: "Get AI insights",
-    description:
-      "Run AI analysis to identify issues and generate actionable fix plans.",
-  },
+  ...(AI_ANALYSIS_ENABLED
+    ? [
+      {
+        number: "04",
+        title: "Get AI insights",
+        description:
+          "Run AI analysis to identify issues and generate actionable fix plans.",
+      },
+    ]
+    : []),
 ];
+
+// The step list loses its last entry when AI Analysis is held back, so the
+// heading counts rather than hard-coding "Four".
+const stepCountWord = steps.length === 4 ? "Four" : "Three";
 
 const exampleRepos = [
   { owner: "vercel", repo: "turbo", label: "vercel/turbo" },
@@ -318,27 +327,29 @@ export default function Home() {
             </h2>
           </div>
 
-          {/* Highlighted AI feature card */}
-          <div className="mb-6">
-            <div className="group relative rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-500/5 via-teal-400/5 to-violet-500/5 p-6 sm:p-8 transition-colors hover:bg-violet-500/10">
-              <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-500 border border-violet-500/20">
-                New
-              </span>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-500 shrink-0">
-                  <aiFeature.icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-medium text-foreground">
-                    {aiFeature.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-                    {aiFeature.description}
-                  </p>
+          {/* Highlighted AI feature card — shown only while AI Analysis is offered */}
+          {AI_ANALYSIS_ENABLED && (
+            <div className="mb-6">
+              <div className="group relative rounded-xl border border-violet-500/30 bg-gradient-to-r from-violet-500/5 via-teal-400/5 to-violet-500/5 p-6 sm:p-8 transition-colors hover:bg-violet-500/10">
+                <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-violet-500/10 px-2.5 py-0.5 text-xs font-medium text-violet-500 border border-violet-500/20">
+                  New
+                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-violet-500/10 text-violet-500 shrink-0">
+                    <aiFeature.icon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-medium text-foreground">
+                      {aiFeature.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+                      {aiFeature.description}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {features.map((feature) => (
@@ -436,86 +447,88 @@ export default function Home() {
       </section>
 
       {/* ── AI Analysis ──────────────────────────────────── */}
-      <section className="border-t border-border">
-        <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-12 lg:gap-16">
-            {/* Left: copy */}
-            <div className="flex-1 max-w-md">
-              <p className="text-sm font-mono uppercase tracking-widest text-muted-foreground mb-3">
-                AI Analysis
-              </p>
-              <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground leading-tight">
-                Fix issues with AI-powered insights
-              </h2>
-              <p className="mt-4 text-muted-foreground leading-relaxed">
-                Analyze your monorepo&rsquo;s dependency health, architecture,
-                and Turborepo best practices. Then generate step-by-step fix
-                plans you can edit and share with your team.
-              </p>
-              <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
-                <Sparkles className="w-4 h-4 text-violet-500" />
-                <span>Powered by Claude</span>
-              </div>
-            </div>
-
-            {/* Right: mock AI output */}
-            <div className="flex-1">
-              <div className="rounded-xl border border-border bg-muted/20 overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-                  <Sparkles className="w-3.5 h-3.5 text-violet-500" />
-                  <span className="text-xs text-muted-foreground font-mono">
-                    AI Analysis
-                  </span>
-                  <span className="ml-auto inline-flex items-center rounded-full bg-teal-500/10 px-2 py-0.5 text-[10px] font-medium text-teal-500">
-                    Completed
-                  </span>
+      {AI_ANALYSIS_ENABLED && (
+        <section className="border-t border-border">
+          <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-12 lg:gap-16">
+              {/* Left: copy */}
+              <div className="flex-1 max-w-md">
+                <p className="text-sm font-mono uppercase tracking-widest text-muted-foreground mb-3">
+                  AI Analysis
+                </p>
+                <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground leading-tight">
+                  Fix issues with AI-powered insights
+                </h2>
+                <p className="mt-4 text-muted-foreground leading-relaxed">
+                  Analyze your monorepo&rsquo;s dependency health, architecture,
+                  and Turborepo best practices. Then generate step-by-step fix
+                  plans you can edit and share with your team.
+                </p>
+                <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
+                  <Sparkles className="w-4 h-4 text-violet-500" />
+                  <span>Powered by Claude</span>
                 </div>
+              </div>
 
-                <div className="p-5 text-[13px] leading-relaxed space-y-3 text-muted-foreground">
-                  <p className="font-medium text-foreground">
-                    Monorepo Health Report
-                  </p>
-                  <div className="space-y-1.5">
-                    <p>
-                      <span className="text-teal-500">&#10003;</span>{" "}
-                      Workspace structure follows best practices
-                    </p>
-                    <p>
-                      <span className="text-yellow-500">&#9888;</span>{" "}
-                      3 packages have circular dependency risks
-                    </p>
-                    <p>
-                      <span className="text-yellow-500">&#9888;</span>{" "}
-                      Shared config package could reduce duplication
-                    </p>
+              {/* Right: mock AI output */}
+              <div className="flex-1">
+                <div className="rounded-xl border border-border bg-muted/20 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+                    <span className="text-xs text-muted-foreground font-mono">
+                      AI Analysis
+                    </span>
+                    <span className="ml-auto inline-flex items-center rounded-full bg-teal-500/10 px-2 py-0.5 text-[10px] font-medium text-teal-500">
+                      Completed
+                    </span>
                   </div>
-                  <div className="pt-2 border-t border-border space-y-1.5">
-                    <p className="font-medium text-foreground flex items-center gap-1.5">
-                      <Wrench className="w-3.5 h-3.5 text-violet-500" />
-                      Fix Plan
+
+                  <div className="p-5 text-[13px] leading-relaxed space-y-3 text-muted-foreground">
+                    <p className="font-medium text-foreground">
+                      Monorepo Health Report
                     </p>
-                    <p>
-                      <span className="font-mono text-violet-500">1.</span>{" "}
-                      Extract shared types to{" "}
-                      <code className="font-mono text-foreground text-xs bg-muted px-1 py-0.5 rounded">
-                        packages/types
-                      </code>
-                    </p>
-                    <p>
-                      <span className="font-mono text-violet-500">2.</span>{" "}
-                      Update import paths in 4 affected packages
-                    </p>
-                    <p>
-                      <span className="font-mono text-violet-500">3.</span>{" "}
-                      Add missing peer dependencies
-                    </p>
+                    <div className="space-y-1.5">
+                      <p>
+                        <span className="text-teal-500">&#10003;</span>{" "}
+                        Workspace structure follows best practices
+                      </p>
+                      <p>
+                        <span className="text-yellow-500">&#9888;</span>{" "}
+                        3 packages have circular dependency risks
+                      </p>
+                      <p>
+                        <span className="text-yellow-500">&#9888;</span>{" "}
+                        Shared config package could reduce duplication
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-border space-y-1.5">
+                      <p className="font-medium text-foreground flex items-center gap-1.5">
+                        <Wrench className="w-3.5 h-3.5 text-violet-500" />
+                        Fix Plan
+                      </p>
+                      <p>
+                        <span className="font-mono text-violet-500">1.</span>{" "}
+                        Extract shared types to{" "}
+                        <code className="font-mono text-foreground text-xs bg-muted px-1 py-0.5 rounded">
+                          packages/types
+                        </code>
+                      </p>
+                      <p>
+                        <span className="font-mono text-violet-500">2.</span>{" "}
+                        Update import paths in 4 affected packages
+                      </p>
+                      <p>
+                        <span className="font-mono text-violet-500">3.</span>{" "}
+                        Add missing peer dependencies
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── How It Works ─────────────────────────────────── */}
       <section className="border-t border-border">
@@ -525,11 +538,14 @@ export default function Home() {
               How it works
             </p>
             <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">
-              Four steps to insight
+              {stepCountWord} steps to insight
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 sm:gap-8">
+          <div
+            className={`grid grid-cols-1 sm:grid-cols-2 gap-12 sm:gap-8 ${steps.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"
+              }`}
+          >
             {steps.map((step, i) => (
               <div key={step.number} className="relative text-center">
                 {i < steps.length - 1 && (

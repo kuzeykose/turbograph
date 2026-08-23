@@ -34,6 +34,9 @@ jest.mock("@workspace/ui/components/sheet", () => ({
   ),
 }));
 
+// AI Analysis is held back behind a flag; the rest of the nav is unaffected.
+jest.mock("@/lib/feature-flags", () => ({ AI_ANALYSIS_ENABLED: false }));
+
 const mockSetActiveTab = jest.fn();
 
 jest.mock("@/contexts/repository-context", () => ({
@@ -68,7 +71,7 @@ describe("RepositorySidebar", () => {
   it("offers every tab the same way, session or not", () => {
     render(<RepositorySidebar />);
 
-    for (const label of ["Imports", "Files", "AI Analysis"]) {
+    for (const label of ["Imports", "Files"]) {
       const buttons = buttonFor(label);
       expect(buttons.length).toBeGreaterThan(0);
       for (const button of buttons) expect(button).not.toBeDisabled();
@@ -76,5 +79,15 @@ describe("RepositorySidebar", () => {
 
     fireEvent.click(buttonFor("Imports")[0]!);
     expect(mockSetActiveTab).toHaveBeenCalledWith("imports");
+  });
+
+  /**
+   * A feature that is not being offered has to be absent from the nav, not just
+   * from the page it opens — an entry that leads nowhere is worse than none.
+   */
+  it("leaves AI Analysis out while the feature is off", () => {
+    render(<RepositorySidebar />);
+
+    expect(screen.queryByText("AI Analysis")).toBeNull();
   });
 });

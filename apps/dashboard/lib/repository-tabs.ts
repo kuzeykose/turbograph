@@ -6,6 +6,8 @@
  * to fetch. Disagreement shows up as a tab that opens onto a prompt after it has
  * already spent the reader's rate limit.
  */
+import { AI_ANALYSIS_ENABLED } from "@/lib/feature-flags";
+
 export type RepositoryTab =
   | "files"
   | "commits"
@@ -20,7 +22,10 @@ export const REPOSITORY_TABS: RepositoryTab[] = [
   "turborepo",
   "imports",
   "packages",
-  "analysis",
+  // `analysis` is listed only while the feature is being offered. Left out, a
+  // stale `?tab=analysis` link falls back to the default tab instead of opening
+  // a tab that is no longer rendered.
+  ...(AI_ANALYSIS_ENABLED ? (["analysis"] as const) : []),
 ];
 
 /**
@@ -96,7 +101,9 @@ export function signInPitchFor(tab: RepositoryTab): SignInPitch {
         body: "Signing in with GitHub raises your rate limit from 60 requests an hour to 5,000 and opens the tabs that need one.",
         perks: [
           "5,000 GitHub requests an hour, not 60",
-          "Imports, Files and AI Analysis",
+          AI_ANALYSIS_ENABLED
+            ? "Imports, Files and AI Analysis"
+            : "Imports and Files",
           "Private repositories you choose to connect",
         ],
       };

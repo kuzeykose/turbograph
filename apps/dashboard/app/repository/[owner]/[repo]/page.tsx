@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { tabRequiresSignIn } from "@/lib/repository-tabs";
+import { AI_ANALYSIS_ENABLED } from "@/lib/feature-flags";
 import { useRepositoryContext } from "@/contexts/repository-context";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -245,7 +246,7 @@ export default function RepositoryPage() {
             />
           )}
 
-          {!tabLocked && activeTab === "analysis" && turborepoStructure?.isTurborepo && (
+          {AI_ANALYSIS_ENABLED && !tabLocked && activeTab === "analysis" && turborepoStructure?.isTurborepo && (
             <AnalysisTab
               turborepoStructure={turborepoStructure}
               dependencyGraph={dependencyGraph}

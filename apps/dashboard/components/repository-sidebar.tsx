@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRepositoryContext } from "@/contexts/repository-context";
 import { type RepositoryTab } from "@/lib/repository-tabs";
+import { AI_ANALYSIS_ENABLED } from "@/lib/feature-flags";
 import { Clock, BarChart3, List, Menu, Sparkles, Waypoints, Folder } from "@workspace/ui/icons";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -147,11 +148,15 @@ export function RepositorySidebar() {
           label: "Packages",
           icon: <List className="h-4 w-4" />,
         },
-        {
-          value: "analysis" as const,
-          label: "AI Analysis",
-          icon: <Sparkles className="h-4 w-4" />,
-        },
+        ...(AI_ANALYSIS_ENABLED
+          ? [
+            {
+              value: "analysis" as const,
+              label: "AI Analysis",
+              icon: <Sparkles className="h-4 w-4" />,
+            },
+          ]
+          : []),
       ]
       : []),
     {

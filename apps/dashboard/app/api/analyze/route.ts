@@ -6,10 +6,21 @@ import {
   FIX_SYSTEM_PROMPT,
 } from "@/lib/prompts/monorepo-analysis";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { AI_ANALYSIS_ENABLED } from "@/lib/feature-flags";
 
 const client = new Anthropic();
 
 export async function POST(req: Request) {
+  // While the feature is held back the route answers as if it were not there:
+  // hiding the tab does nothing about a direct POST, and every call spends
+  // model credits.
+  if (!AI_ANALYSIS_ENABLED) {
+    return new Response(JSON.stringify({ error: "Not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   // Analysis spends model credits per call, so it is gated here rather than
   // only in the UI: hiding the tab does nothing about a direct POST.
   const supabase = await createSupabaseServerClient();
