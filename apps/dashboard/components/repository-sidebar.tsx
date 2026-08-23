@@ -21,6 +21,8 @@ interface NavItem {
   value: TabValue;
   label: string;
   icon: React.ReactNode;
+  /** Short qualifier shown beside the label, e.g. "Beta". */
+  badge?: string;
 }
 
 function SidebarNavExpanded({
@@ -47,6 +49,11 @@ function SidebarNavExpanded({
         >
           <span className="flex-shrink-0">{item.icon}</span>
           {item.label}
+          {item.badge && (
+            <span className="ml-auto rounded-full border border-violet-500/20 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-medium leading-none uppercase tracking-wide text-violet-600 dark:text-violet-400">
+              {item.badge}
+            </span>
+          )}
         </button>
       ))}
     </nav>
@@ -68,16 +75,24 @@ function SidebarNavCollapsed({
         <button
           key={item.value}
           onClick={() => onTabChange(item.value)}
-          title={item.label}
-          aria-label={item.label}
+          title={item.badge ? `${item.label} (${item.badge})` : item.label}
+          aria-label={
+            item.badge ? `${item.label} (${item.badge})` : item.label
+          }
           className={cn(
-            "h-8 rounded-sm p-2 transition-colors",
+            "relative h-8 rounded-sm p-2 transition-colors",
             activeTab === item.value
               ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
               : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-50",
           )}
         >
           <span className="flex-shrink-0">{item.icon}</span>
+          {item.badge && (
+            <span
+              aria-hidden="true"
+              className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-violet-500"
+            />
+          )}
         </button>
       ))}
     </nav>
@@ -137,6 +152,7 @@ export function RepositorySidebar() {
           value: "imports" as const,
           label: "Imports",
           icon: <Waypoints className="h-4 w-4" />,
+          badge: "Beta",
         },
         {
           value: "commits" as const,

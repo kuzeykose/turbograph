@@ -82,6 +82,18 @@ describe("RepositorySidebar", () => {
   });
 
   /**
+   * Imports scans the whole repo and can come back truncated, so the nav says
+   * so before the reader opens it.
+   */
+  it("marks the Imports tab as beta", () => {
+    render(<RepositorySidebar />);
+
+    expect(screen.getAllByText("Beta").length).toBeGreaterThan(0);
+    // The collapsed rail has no room for the pill, so the name carries it.
+    expect(screen.getAllByLabelText("Imports (Beta)").length).toBeGreaterThan(0);
+  });
+
+  /**
    * A feature that is not being offered has to be absent from the nav, not just
    * from the page it opens — an entry that leads nowhere is worse than none.
    */
