@@ -1,5 +1,5 @@
 import React from "react";
-import { render, waitFor, fireEvent } from "@testing-library/react";
+import { render, waitFor, fireEvent, act } from "@testing-library/react";
 import { TurborepoGraphVisual } from "@/components/turborepo-graph-visual";
 import { GraphCanvasLayer } from "@/components/graph/graph-canvas-layer";
 import { PackageInfo, DependencyEdge } from "@/lib/utils/turborepo";
@@ -169,9 +169,14 @@ describe("GraphCanvasLayer", () => {
     await waitFor(() => {
       expect(calls.roundRect).toBeGreaterThan(0);
     });
+    await new Promise((resolve) => setTimeout(resolve, 80));
     const fitted = calls.roundRect;
 
-    expect(fitted).toBe(600);
+    // One paint of the fitted graph is 600 cards. A second animation-frame
+    // paint on mount is harmless; a continuous loop is not.
+    expect(fitted).toBeGreaterThanOrEqual(600);
+    expect(fitted % 600).toBe(0);
+    expect(fitted).toBeLessThanOrEqual(1800);
 
     const canvas = container.querySelector("canvas")!;
     // Positive deltaY zooms in, matching the original wheel handling.
@@ -401,5 +406,67 @@ describe("GraphCanvasLayer", () => {
     // mark says less than the mark alone, so the cards are left bare.
     // `fitLabel` covers the sizes either side of the switch.
     expect(calls.fillText).toBe(0);
+  });
+
+  /**
+   * Assigning `canvas.width` clears the drawing buffer. A ResizeObserver that
+   * retriggers from that assignment — the WebGL imports-page flicker — would
+   * show a blank frame every time. Same-size notifications must not reset it.
+   */
+  it("does not reset the canvas backing store when ResizeObserver retriggers at the same size", async () => {
+    const observers: Array<() => void> = [];
+    const OriginalRO = global.ResizeObserver;
+    class FakeRO {
+      callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+        observers.push(() => callback([], this as unknown as ResizeObserver));
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    global.ResizeObserver = FakeRO as unknown as typeof ResizeObserver;
+
+    try {
+      const calls = installCanvasSpy();
+      const { packages, dependencies } = chainGraph(400);
+      const { container } = render(
+        <TurborepoGraphVisual
+          apps={[]}
+          packages={packages}
+          dependencies={dependencies}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(calls.roundRect).toBeGreaterThan(0);
+      });
+
+      const canvas = container.querySelector("canvas")!;
+      // Prime the last-size latch the way a real first layout notification would.
+      await act(async () => {
+        for (const fire of observers) fire();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
+
+      const widthBefore = canvas.width;
+      const heightBefore = canvas.height;
+      const painted = calls.roundRect;
+
+      await act(async () => {
+        for (let i = 0; i < 8; i++) {
+          for (const fire of observers) fire();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
+
+      expect(canvas.width).toBe(widthBefore);
+      expect(canvas.height).toBe(heightBefore);
+      // Extra same-size notifications must not force another full paint either.
+      expect(calls.roundRect).toBe(painted);
+    } finally {
+      global.ResizeObserver = OriginalRO;
+    }
   });
 });
