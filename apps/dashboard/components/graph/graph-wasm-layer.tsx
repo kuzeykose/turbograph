@@ -30,6 +30,10 @@ import {
   sublabelFontPx,
 } from "./label-placement";
 import type { GraphViewportApi } from "./use-graph-viewport";
+import {
+  cssPixelSize,
+  syncCanvasBackingStore,
+} from "./canvas-backing-store";
 
 const DRAG_THRESHOLD_SQ = 36;
 
@@ -120,6 +124,11 @@ export function GraphWasmLayer({
   } | null>(null);
 
   const [ready, setReady] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const labelCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const lastCssSizeRef = useRef({ width: -1, height: -1 });
+  const requestRender = viewport.requestRender;
+  const viewportBoxRef = viewport.viewportRef;
 
   /** Node index is the wasm identity; names stay on this side. */
   const indexById = useMemo(() => {
@@ -194,8 +203,8 @@ export function GraphWasmLayer({
       types.subarray(0, kept),
     );
     wasm.setPositions(x, y);
-    viewport.requestRender();
-  }, [ready, nodes, edges, indexById, viewport]);
+    requestRender();
+  }, [ready, nodes, edges, indexById, requestRender]);
 
   // --- painting -------------------------------------------------------------
   const draw = useCallback(() => {
@@ -205,14 +214,16 @@ export function GraphWasmLayer({
     const labelCanvas = labelCanvasRef.current;
     if (!wasm || !renderer || !glCanvas || !labelCanvas) return;
 
-    const cssWidth = glCanvas.clientWidth;
-    const cssHeight = glCanvas.clientHeight;
+    const { width: cssWidth, height: cssHeight } = cssPixelSize(glCanvas);
     if (cssWidth === 0 || cssHeight === 0) return;
 
     const dpr = window.devicePixelRatio || 1;
-    renderer.resize(Math.round(cssWidth * dpr), Math.round(cssHeight * dpr));
+    renderer.resize(
+      Math.round(cssWidth * dpr),
+      Math.round(cssHeight * dpr),
+    );
 
-    const view = viewport.viewportRef.current;
+    const view = viewportBoxRef.current;
     const scale = cssWidth / view.width;
 
     const drag = dragRef.current;
@@ -238,17 +249,15 @@ export function GraphWasmLayer({
     });
 
     // --- label overlay: only what is on screen, only when legible ---
-    const labelCtx = labelCanvas.getContext("2d");
-    if (!labelCtx) return;
-    const pixelWidth = Math.round(cssWidth * dpr);
-    const pixelHeight = Math.round(cssHeight * dpr);
-    if (
-      labelCanvas.width !== pixelWidth ||
-      labelCanvas.height !== pixelHeight
-    ) {
-      labelCanvas.width = pixelWidth;
-      labelCanvas.height = pixelHeight;
+    let labelCtx = labelCtxRef.current;
+    if (!labelCtx || labelCtx.canvas !== labelCanvas) {
+      labelCtx = labelCanvas.getContext("2d");
+      labelCtxRef.current = labelCtx;
     }
+    if (!labelCtx) return;
+    // Same backing-store rule as the WebGL canvas: assigning width/height
+    // clears the bitmap, so a no-op resize must not touch the attributes.
+    syncCanvasBackingStore(labelCanvas, cssWidth, cssHeight, dpr);
     labelCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     labelCtx.clearRect(0, 0, cssWidth, cssHeight);
     labelCtx.textAlign = "center";
@@ -306,7 +315,7 @@ export function GraphWasmLayer({
       }
     }
     labelCtx.globalAlpha = 1;
-  }, [dimUnrelated, nodes, selectedIndex, viewport]);
+  }, [dimUnrelated, nodes, selectedIndex, viewportBoxRef]);
 
   useEffect(() => registerRender(draw), [draw, registerRender]);
 
@@ -314,13 +323,28 @@ export function GraphWasmLayer({
     if (ready) draw();
   }, [ready, draw]);
 
+  /**
+   * Paint when the surface's CSS box actually changes. Observing the WebGL
+   * canvas and calling `draw()` on every notification was a flicker loop:
+   * `draw` assigns `canvas.width` (which clears the buffer) and that
+   * assignment itself retriggers ResizeObserver, often with a 1px CSS
+   * oscillation once the backing store is large. The viewport already
+   * observes the same surface; this is the safety net for the first layout
+   * after wasm becomes ready, when `draw` returned early on a 0×0 box.
+   */
   useEffect(() => {
-    const canvas = glCanvasRef.current;
-    if (!canvas || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => draw());
-    observer.observe(canvas);
+    const el = wrapperRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const { width, height } = cssPixelSize(el);
+      const last = lastCssSizeRef.current;
+      if (width === last.width && height === last.height) return;
+      lastCssSizeRef.current = { width, height };
+      requestRender();
+    });
+    observer.observe(el);
     return () => observer.disconnect();
-  }, [draw]);
+  }, [requestRender]);
 
   // --- interaction ----------------------------------------------------------
   const hitTest = useCallback(
@@ -441,11 +465,14 @@ export function GraphWasmLayer({
   );
 
   return (
-    <div className={cn("absolute inset-0 select-none", className)}>
-      <canvas ref={glCanvasRef} className="absolute inset-0 h-full w-full" />
+    <div ref={wrapperRef} className={cn("absolute inset-0 select-none", className)}>
+      <canvas
+        ref={glCanvasRef}
+        className="absolute inset-0 block h-full w-full"
+      />
       <canvas
         ref={labelCanvasRef}
-        className="absolute inset-0 h-full w-full"
+        className="absolute inset-0 block h-full w-full"
         aria-label={`Dependency graph with ${nodes.length} nodes`}
         role="img"
         onMouseDown={handleMouseDown}
