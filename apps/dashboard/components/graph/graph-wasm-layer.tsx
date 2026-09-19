@@ -217,6 +217,8 @@ export function GraphWasmLayer({
     const { width: cssWidth, height: cssHeight } = cssPixelSize(glCanvas);
     if (cssWidth === 0 || cssHeight === 0) return;
 
+    lastCssSizeRef.current = { width: cssWidth, height: cssHeight };
+
     const dpr = window.devicePixelRatio || 1;
     renderer.resize(
       Math.round(cssWidth * dpr),

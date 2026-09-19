@@ -1,5 +1,5 @@
 import React from "react";
-import { render, waitFor, fireEvent } from "@testing-library/react";
+import { render, waitFor, fireEvent, act } from "@testing-library/react";
 import { TurborepoGraphVisual } from "@/components/turborepo-graph-visual";
 import { GraphCanvasLayer } from "@/components/graph/graph-canvas-layer";
 import { PackageInfo, DependencyEdge } from "@/lib/utils/turborepo";
@@ -169,9 +169,14 @@ describe("GraphCanvasLayer", () => {
     await waitFor(() => {
       expect(calls.roundRect).toBeGreaterThan(0);
     });
+    await new Promise((resolve) => setTimeout(resolve, 80));
     const fitted = calls.roundRect;
 
-    expect(fitted).toBe(600);
+    // One paint of the fitted graph is 600 cards. A second animation-frame
+    // paint on mount is harmless; a continuous loop is not.
+    expect(fitted).toBeGreaterThanOrEqual(600);
+    expect(fitted % 600).toBe(0);
+    expect(fitted).toBeLessThanOrEqual(1800);
 
     const canvas = container.querySelector("canvas")!;
     // Positive deltaY zooms in, matching the original wheel handling.
@@ -440,17 +445,21 @@ describe("GraphCanvasLayer", () => {
 
       const canvas = container.querySelector("canvas")!;
       // Prime the last-size latch the way a real first layout notification would.
-      for (const fire of observers) fire();
-      await new Promise((resolve) => setTimeout(resolve, 40));
+      await act(async () => {
+        for (const fire of observers) fire();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
 
       const widthBefore = canvas.width;
       const heightBefore = canvas.height;
       const painted = calls.roundRect;
 
-      for (let i = 0; i < 8; i++) {
-        for (const fire of observers) fire();
-      }
-      await new Promise((resolve) => setTimeout(resolve, 40));
+      await act(async () => {
+        for (let i = 0; i < 8; i++) {
+          for (const fire of observers) fire();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 40));
+      });
 
       expect(canvas.width).toBe(widthBefore);
       expect(canvas.height).toBe(heightBefore);

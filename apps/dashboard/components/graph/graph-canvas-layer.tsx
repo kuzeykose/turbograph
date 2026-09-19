@@ -201,6 +201,7 @@ export function GraphCanvasLayer({
 
     const dpr = window.devicePixelRatio || 1;
     syncCanvasBackingStore(canvas, cssWidth, cssHeight, dpr);
+    lastCssSizeRef.current = { width: cssWidth, height: cssHeight };
 
     const view = viewportBoxRef.current;
     const scaleX = cssWidth / view.width;
