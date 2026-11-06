@@ -69,6 +69,7 @@ export function useGraphViewport({
   const rectRef = useRef<DOMRect | null>(null);
   const frameRef = useRef<number | null>(null);
   const panOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const lastCssSizeRef = useRef({ w: -1, h: -1 });
 
   const [zoom, setZoom] = useState(1);
 
@@ -145,11 +146,20 @@ export function useGraphViewport({
             invalidate();
             // Keep the viewport's aspect on the surface's, so `toGraphPoint`
             // stays the exact inverse of what the renderer paints.
-            const rect = element.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              const view = viewportRef.current;
-              view.height = view.width * (rect.height / rect.width);
+            const width = element.clientWidth;
+            const height = element.clientHeight;
+            if (width <= 0 || height <= 0) return;
+            // Integer CSS pixels only. Subpixel jitter from
+            // getBoundingClientRect must not count as a resize: the WebGL
+            // path clears its drawing buffer whenever canvas.width is
+            // reassigned, which is what flickered the imports graph.
+            const last = lastCssSizeRef.current;
+            if (width === last.w && height === last.h) {
+              return;
             }
+            lastCssSizeRef.current = { w: width, h: height };
+            const view = viewportRef.current;
+            view.height = view.width * (height / width);
             requestRender();
           })
         : null;

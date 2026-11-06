@@ -23,6 +23,8 @@ import {
   sublabelFontPx,
 } from "./label-placement";
 import type { GraphViewportApi } from "./use-graph-viewport";
+import { syncCanvasBackingStore } from "./canvas-backing-store";
+
 /** Arrowheads are sub-pixel below this and only cost fill time. */
 const ARROW_MIN_SCALE = 0.35;
 /**
@@ -124,6 +126,9 @@ export function GraphCanvasLayer({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const hoveredRef = useRef<string | null>(null);
   const paletteRef = useRef<ReturnType<typeof buildPalette> | null>(null);
+  const lastCssSizeRef = useRef({ width: -1, height: -1 });
+  const requestRender = viewport.requestRender;
+  const viewportBoxRef = viewport.viewportRef;
 
   const panningRef = useRef(false);
   const draggedRef = useRef<{
@@ -195,14 +200,10 @@ export function GraphCanvasLayer({
     if (cssWidth === 0 || cssHeight === 0) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const pixelWidth = Math.round(cssWidth * dpr);
-    const pixelHeight = Math.round(cssHeight * dpr);
-    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-      canvas.width = pixelWidth;
-      canvas.height = pixelHeight;
-    }
+    syncCanvasBackingStore(canvas, cssWidth, cssHeight, dpr);
+    lastCssSizeRef.current = { width: cssWidth, height: cssHeight };
 
-    const view = viewport.viewportRef.current;
+    const view = viewportBoxRef.current;
     const scaleX = cssWidth / view.width;
     const scaleY = cssHeight / view.height;
 
@@ -362,7 +363,7 @@ export function GraphCanvasLayer({
     nodes,
     nodeById,
     selectedNode,
-    viewport,
+    viewportBoxRef,
   ]);
 
   // Publish the paint function so viewport changes can drive it without React.
@@ -372,13 +373,26 @@ export function GraphCanvasLayer({
     draw();
   }, [draw]);
 
+  /**
+   * Only repaint when the CSS box actually changes. Assigning `canvas.width`
+   * clears the bitmap; a ResizeObserver that retriggers from that assignment
+   * would flash the graph. Same-size notifications are ignored, and the
+   * viewport already coalesces real resizes onto one animation frame.
+   */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => draw());
+    const observer = new ResizeObserver(() => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const last = lastCssSizeRef.current;
+      if (width === last.width && height === last.height) return;
+      lastCssSizeRef.current = { width, height };
+      requestRender();
+    });
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [draw]);
+  }, [requestRender]);
 
   const hitTest = useCallback(
     (clientX: number, clientY: number): CanvasNode | null => {
@@ -512,7 +526,10 @@ export function GraphCanvasLayer({
       ref={canvasRef}
       // `select-none`: a drag that starts here must not begin a text selection
       // across the toolbar and legend around the graph.
-      className={cn("absolute inset-0 h-full w-full select-none", className)}
+      className={cn(
+        "absolute inset-0 block h-full w-full select-none",
+        className,
+      )}
       aria-label={`Dependency graph with ${nodes.length} nodes`}
       role="img"
       onMouseDown={handleMouseDown}

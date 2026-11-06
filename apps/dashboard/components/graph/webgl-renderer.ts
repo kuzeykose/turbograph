@@ -209,7 +209,11 @@ export class WebglGraphRenderer {
       antialias: true,
       // The renderer repaints every frame it is asked for; nothing reads back.
       preserveDrawingBuffer: false,
-      desynchronized: true,
+      // `desynchronized` lets the compositor present the drawing buffer while
+      // this frame is still being built. A large import graph spends a long
+      // time in `bufferData` after `clear`, so the page flashes the empty
+      // (transparent) buffer between paints. Keep the canvas locked to the
+      // event loop instead.
     });
     if (!gl) throw new Error("WebGL2 is not available");
     this.gl = gl;
@@ -312,11 +316,16 @@ export class WebglGraphRenderer {
 
   resize(pixelWidth: number, pixelHeight: number) {
     const canvas = this.gl.canvas as HTMLCanvasElement;
-    if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-      canvas.width = pixelWidth;
-      canvas.height = pixelHeight;
+    const width = Math.max(1, pixelWidth);
+    const height = Math.max(1, pixelHeight);
+    // Assigning `canvas.width` resets the WebGL drawing buffer. Skip when the
+    // backing store already matches, otherwise a ResizeObserver echo would
+    // blank the graph every frame.
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
     }
-    this.gl.viewport(0, 0, pixelWidth, pixelHeight);
+    this.gl.viewport(0, 0, width, height);
   }
 
   draw(frame: FrameInput) {
