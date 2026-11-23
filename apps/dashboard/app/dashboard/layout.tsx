@@ -1,5 +1,4 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "@workspace/ui/icons";
 import {
@@ -9,6 +8,13 @@ import {
   BreadcrumbPage,
 } from "@workspace/ui/components/breadcrumb";
 import { UserMenu } from "@/components/user-menu";
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+  description:
+    "Browse your GitHub repositories and open their Turborepo dependency graphs.",
+  robots: { index: false, follow: false },
+};
 
 export default function DashboardLayout({
   children,

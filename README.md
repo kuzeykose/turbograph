@@ -124,6 +124,9 @@ Sign-in is **Supabase Auth + a GitHub App**. Put the GitHub App Client ID and Se
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
    NEXT_PUBLIC_GITHUB_APP_SLUG=your-github-app-slug
+   # Optional: public origin used for canonical URLs and link-preview images.
+   # On Vercel this falls back to the production domain automatically.
+   NEXT_PUBLIC_SITE_URL=https://your-domain
    ```
 
 5. **Run the dashboard:**

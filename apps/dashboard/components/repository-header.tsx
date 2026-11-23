@@ -1,3 +1,5 @@
+"use client";
+
 import { useAuth } from "@/contexts/auth-context";
 import { useRepositoryContext } from "@/contexts/repository-context";
 import Link from "next/link";
