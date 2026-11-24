@@ -58,6 +58,9 @@ This Next.js application demonstrates client-side GitHub OAuth authentication us
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 NEXT_PUBLIC_GITHUB_APP_SLUG=your-github-app-slug
+# Optional: public origin used for canonical URLs and link-preview images.
+# On Vercel this falls back to the production domain automatically.
+NEXT_PUBLIC_SITE_URL=https://your-domain
 ```
 
 ### 4. Install Dependencies

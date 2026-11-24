@@ -1,5 +1,4 @@
-"use client";
-
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "@workspace/ui/icons";
 import {
@@ -8,6 +7,13 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@workspace/ui/components/breadcrumb";
+
+export const metadata: Metadata = {
+  title: "Sign in",
+  description:
+    "Sign in with GitHub to explore your Turborepo repositories on Turbograph.",
+  alternates: { canonical: "/login" },
+};
 
 export default function LoginLayout({
   children,
